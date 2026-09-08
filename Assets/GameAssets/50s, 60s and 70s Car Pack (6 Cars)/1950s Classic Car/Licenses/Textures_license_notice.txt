@@ -1,0 +1,5 @@
+Copyright (C) 2021, Empty Room Games
+
+The textures (bumpers_NRM.png, bumpersticker_love_TEXTURE.png, bumpersticker_saradio_TEXTURE.png, grill_NRM.png, grill_SPEC_METAL.png, headlight_NRM.png, plate_TEXTURE.png, taillight_NRM.png, tire_NRM.png, tire_TEXTURE.png, trimmings_NRM.png, vinyl_NRM.png, Carpet.png) was created in Blender by me (TheKnightsKing)
+
+Please refer to the Unity Asset Store Terms of Service and EULA

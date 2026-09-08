@@ -1,0 +1,5 @@
+Copyright (C) 2021, Empty Room Games
+
+The textures (brakelight_TEXTURE.png, chrome_TEXTURE.png, fadedchrome_NRM.png, fadedchrome_TEXTURE.png, grill_NRM.png, grill_SPEC_METAL.png, headlight_NRM.png, tyre_NRM.png, tyre_TEXTURE.png, undercarriage_NRM.png, undercarriage_TEXTURE.png, underchrome_METAL.png, plate_TEXTURE.png) was created in Blender by me (TheKnightsKing)
+
+Please refer to the Unity Asset Store Terms of Service and EULA
