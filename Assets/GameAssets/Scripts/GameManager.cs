@@ -14,6 +14,7 @@ public class GameManager : MonoBehaviour
     public GameObject[] playerCars;
     public GameObject[] missionAreas;
     public ParkingTrigger[] parkingTriggers;
+
     public int currentMission = 0;
     public bool[] missionCompleted;
 
@@ -35,6 +36,8 @@ public class GameManager : MonoBehaviour
         missionCompleted = new bool[missionStartPoints.Length];
 
         ShowMissionTextForCurrentMission();
+        SetActiveMissionArea();
+        SpawnPlayerAtMissionStart();
     }
 
     public void ReplayMission(int missionIndex)
@@ -77,5 +80,31 @@ public class GameManager : MonoBehaviour
     {
         UpdateMissionText();
         StartCoroutine(DisplayMissionText());
+    }
+
+    public void SetActiveMissionArea()
+    {
+        for (int i = 0; i < missionAreas.Length; i++)
+        {
+            missionAreas[i].SetActive(i == currentMission);
+        }
+    }
+
+    public void SpawnPlayerAtMissionStart()
+    {
+        if (currentMission < missionStartPoints.Length && playerCars.Length > 0)
+        {
+            foreach (var car in playerCars)
+            {
+                if (car != null)
+                {
+                    car.transform.position =
+                        missionStartPoints[currentMission].position;
+
+                    car.transform.rotation =
+                        missionStartPoints[currentMission].rotation;
+                }
+            }
+        }
     }
 }
