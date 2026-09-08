@@ -34,6 +34,19 @@ public class MissionFailedHandler : MonoBehaviour
 
     public void RetryMission()
     {
-        Debug.Log("Mission Retry");
+        foreach (var car in carControllers)
+        {
+            if (car != null)
+            {
+                car.maxAcceleration = 20;
+            }
+        }
+
+        GameManager.Instance.SpawnPlayerAtMissionStart();
+
+        missionFailedUI.SetActive(false);
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 }

@@ -40,6 +40,8 @@ public class ParkingTrigger : MonoBehaviour
     {
         missionCompleted = true;
         ShowMissionPassed();
+
+        GameManager.Instance.CompleteMission();
     }
 
     void ShowMissionPassed()
@@ -60,6 +62,23 @@ public class ParkingTrigger : MonoBehaviour
 
     public void NextMission()
     {
-        Debug.Log("Next Mission Played");
+        foreach (var car in carControllers)
+        {
+            if (car != null)
+            {
+                car.maxAcceleration = 20;
+            }
+        }
+
+        GameManager.Instance.SpawnPlayerAtMissionStart();
+
+        missionPassedUI.SetActive(false);
+
+        GameManager.Instance.SetActiveMissionArea();
+
+        GameManager.Instance.ShowMissionTextForCurrentMission();
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 }
