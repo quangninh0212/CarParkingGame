@@ -35,6 +35,7 @@ public class GameManager : MonoBehaviour
     {
         missionCompleted = new bool[missionStartPoints.Length];
 
+        LoadProgress();
         ShowMissionTextForCurrentMission();
         SetActiveMissionArea();
         SpawnPlayerAtMissionStart();
@@ -47,6 +48,8 @@ public class GameManager : MonoBehaviour
 
         currentMission = missionIndex;
         UpdateMissionText();
+        SetActiveMissionArea();
+        SpawnPlayerAtMissionStart();
     }
 
     private void UpdateMissionText()
@@ -121,6 +124,46 @@ public class GameManager : MonoBehaviour
         {
             missionCompleted[currentMission] = true;
             UpdateMissionText();
+        }
+
+        SaveProgress();
+    }
+
+    public void SaveProgress()
+    {
+        PlayerPrefs.SetInt("CurrentMission", currentMission);
+
+        for (int i = 0; i < missionCompleted.Length; i++)
+        {
+            PlayerPrefs.SetInt($"Mission{i}Completed", missionCompleted[i] ? 1 : 0);
+        }
+
+        PlayerPrefs.Save();
+    }
+
+
+    public void LoadProgress()
+    {
+        if (PlayerPrefs.HasKey("CurrentMission"))
+        {
+            currentMission = PlayerPrefs.GetInt("CurrentMission");
+
+            for (int i = 0; i < missionCompleted.Length; i++)
+            {
+                missionCompleted[i] =
+                    PlayerPrefs.GetInt($"Mission{i}Completed", 0) == 1;
+            }
+        }
+        else
+        {
+            currentMission = 0;
+
+            missionCompleted[0] = true;
+
+            for (int i = 1; i < missionCompleted.Length; i++)
+            {
+                missionCompleted[i] = false;
+            }
         }
     }
 }

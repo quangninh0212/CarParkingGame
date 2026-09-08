@@ -80,5 +80,7 @@ public class ParkingTrigger : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        GameManager.Instance.SaveProgress();
     }
 }
