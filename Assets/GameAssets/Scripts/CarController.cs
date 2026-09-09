@@ -61,7 +61,15 @@ public class CarController : MonoBehaviour
     {
         Move();
         Steer();
-        Brake();
+
+        if(Input.GetKey(KeyCode.Space) || control == ControlMode.Keyboard)
+        {
+            Brake();
+        }
+        else if(SimpleInput.GetButton("Break") || control == ControlMode.Buttons)
+        {
+            Brake();
+        }
     }
 
     IEnumerator SetCar()
@@ -86,6 +94,12 @@ public class CarController : MonoBehaviour
         {
             moveInput = Input.GetAxis("Vertical");
             steerInput = Input.GetAxis("Horizontal");
+        }
+
+        else if(control == ControlMode.Buttons)
+        {
+            moveInput = SimpleInput.GetAxis("Vertical");
+            steerInput = SimpleInput.GetAxis("Horizontal");
         }
     }
 
@@ -119,7 +133,7 @@ public class CarController : MonoBehaviour
 
     void Brake()
     {
-        if (Input.GetKey(KeyCode.Space) || moveInput == 0)
+        if (moveInput == 0)
         {
             foreach (var wheel in wheels)
             {

@@ -37396,7 +37396,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3b61e3d4e4fa974683b13f78dda393e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  control: 0
+  control: 1
   maxAcceleration: 20
   brakeAcceleration: 200000
   turnSensitivity: 1.2
@@ -38414,7 +38414,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3b61e3d4e4fa974683b13f78dda393e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  control: 0
+  control: 1
   maxAcceleration: 20
   brakeAcceleration: 200000
   turnSensitivity: 1.2
@@ -159584,7 +159584,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3b61e3d4e4fa974683b13f78dda393e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  control: 0
+  control: 1
   maxAcceleration: 20
   brakeAcceleration: 200000
   turnSensitivity: 1.2
