@@ -20,6 +20,8 @@ public class GameManager : MonoBehaviour
 
     private void Awake()
     {
+        missionCompleted = new bool[missionStartPoints.Length];
+
         if (Instance == null)
         {
             Instance = this;
@@ -33,8 +35,6 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
-        missionCompleted = new bool[missionStartPoints.Length];
-
         LoadProgress();
         ShowMissionTextForCurrentMission();
         SetActiveMissionArea();
@@ -127,6 +127,8 @@ public class GameManager : MonoBehaviour
         }
 
         SaveProgress();
+
+        FindFirstObjectByType<MainMenuManager>()?.UpdateMissionButtons();
     }
 
     public void SaveProgress()
@@ -165,5 +167,7 @@ public class GameManager : MonoBehaviour
                 missionCompleted[i] = false;
             }
         }
+
+        FindFirstObjectByType<MainMenuManager>()?.UpdateMissionButtons();
     }
 }
