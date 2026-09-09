@@ -412,7 +412,7 @@ GameObject:
   - component: {fileID: 99671484}
   - component: {fileID: 99671483}
   m_Layer: 5
-  m_Name: Resume
+  m_Name: ResumeButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -481,7 +481,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 99671484}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: 
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &99671484
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3516,7 +3528,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1118770601}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1488606899}
+        m_TargetAssemblyTypeName: MainMenuManager, Assembly-CSharp
+        m_MethodName: BackToMainMenu
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1118770601
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4793,7 +4817,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1386197730}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1488606899}
+        m_TargetAssemblyTypeName: MainMenuManager, Assembly-CSharp
+        m_MethodName: OpenSelectCarUI
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1386197730
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5198,6 +5234,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1488606898}
+  - component: {fileID: 1488606899}
   - component: {fileID: 1488606897}
   - component: {fileID: 1488606896}
   - component: {fileID: 1488606895}
@@ -5293,6 +5330,36 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &1488606899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1488606894}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51e583c50fba6c645bcaf430a445a6e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mainMenu: {fileID: 1405897802}
+  selectCarUI: {fileID: 177159060}
+  selectMissionUI: {fileID: 634730637}
+  missionInformation: {fileID: 2117744807}
+  carControllerScripts:
+  - {fileID: 514021604312279664}
+  missionButtons:
+  - {fileID: 1450177824}
+  - {fileID: 1726139173}
+  - {fileID: 700240753}
+  - {fileID: 1922298978}
+  - {fileID: 1333006339}
+  - {fileID: 315800979}
+  - {fileID: 1167977766}
+  - {fileID: 1364959293}
+  menuCamera: {fileID: 546467312}
+  mainCamera: {fileID: 354533037}
+  resumeButton: {fileID: 99671483}
 --- !u!1 &1512472853
 GameObject:
   m_ObjectHideFlags: 0
@@ -5831,7 +5898,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1666956218}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1488606899}
+        m_TargetAssemblyTypeName: MainMenuManager, Assembly-CSharp
+        m_MethodName: OpenSelectMissionUI
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1666956218
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7343,7 +7422,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 2003579943}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1488606899}
+        m_TargetAssemblyTypeName: MainMenuManager, Assembly-CSharp
+        m_MethodName: QuitGame
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &2003579943
 MonoBehaviour:
   m_ObjectHideFlags: 0
