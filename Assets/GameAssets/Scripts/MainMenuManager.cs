@@ -20,6 +20,11 @@ public class MainMenuManager : MonoBehaviour
 
     public GameObject mobileControls;
 
+    void Awake()
+    {
+        resumeButton.interactable = false;
+    }
+
     void Start()
     {
         ShowMainMenu();
@@ -27,8 +32,6 @@ public class MainMenuManager : MonoBehaviour
         InitializeMissionButtons();
 
         UpdateMissionButtons();
-
-        resumeButton.gameObject.SetActive(false);
     }
 
     public void OpenSelectMissionUI()
@@ -79,9 +82,7 @@ public class MainMenuManager : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        resumeButton.gameObject.SetActive(
-            isGamePaused && Time.timeSinceLevelLoad > 0
-        );
+        resumeButton.interactable = isGamePaused && Time.timeSinceLevelLoad > 0;
     }
 
     public void ResumeGame()
@@ -111,6 +112,7 @@ public class MainMenuManager : MonoBehaviour
     {
         GameManager.Instance.ReplayMission(missionIndex);
         ResumeGame();
+        GameManager.Instance.ShowMissionTextForCurrentMission();
     }
 
     public void UpdateMissionButtons()
