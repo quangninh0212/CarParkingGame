@@ -66,7 +66,7 @@ public class ParkingTrigger : MonoBehaviour
         {
             if (car != null)
             {
-                car.maxAcceleration = 20;
+                car.maxAcceleration = 5;
             }
         }
 

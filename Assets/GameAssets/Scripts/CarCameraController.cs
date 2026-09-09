@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class CarCameraController : MonoBehaviour
 {
@@ -66,6 +67,11 @@ public class CarCameraController : MonoBehaviour
 
     void HandleMouseRotation()
     {
+        if(EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        {
+            return;
+        }
+
         float mouseX =
             Input.GetAxis("Mouse X") *
             mouseSensitivity *
