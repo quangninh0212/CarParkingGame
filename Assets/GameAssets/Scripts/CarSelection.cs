@@ -18,12 +18,7 @@ public class CarSelection : MonoBehaviour
             allCars[i].SetActive(false);
         }
 
-        if (PlayerPrefs.HasKey("SelectedCarIndex"))
-        {
-            currentIndex = PlayerPrefs.GetInt("SelectedCarIndex");
-        }
-
-        ShowCurrentCar();
+        ApplySavedSelection();
     }
 
     void ShowCurrentCar()
@@ -34,6 +29,23 @@ public class CarSelection : MonoBehaviour
         }
 
         allCars[currentIndex].SetActive(true);
+    }
+
+    public void ApplySavedSelection()
+    {
+        if (allCars == null || allCars.Length == 0)
+            return;
+
+        if (PlayerPrefs.HasKey("SelectedCarIndex"))
+        {
+            currentIndex = Mathf.Clamp(
+                PlayerPrefs.GetInt("SelectedCarIndex"),
+                0,
+                allCars.Length - 1
+            );
+        }
+
+        ShowCurrentCar();
     }
 
     public void NextCar()
@@ -54,6 +66,22 @@ public class CarSelection : MonoBehaviour
     {
         PlayerPrefs.SetInt("SelectedCarIndex", currentIndex);
         PlayerPrefs.Save();
+
+        // The showroom and the playable cars are two separate containers, each
+        // with its own CarSelection. Push the new pick to the other one so the
+        // car you drive matches the car you just picked, without a restart.
+        var selections = FindObjectsByType<CarSelection>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None
+        );
+
+        foreach (var selection in selections)
+        {
+            if (selection != this)
+            {
+                selection.ApplySavedSelection();
+            }
+        }
 
         FindFirstObjectByType<MainMenuManager>()?.BackToMainMenu();
     }

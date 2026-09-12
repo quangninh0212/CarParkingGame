@@ -78,7 +78,9 @@ public class CarController : MonoBehaviour
         this.gameObject.transform.position = carPos.position;
     }
 
-    public void MoveInput(float input)
+    public float MoveInput => moveInput;
+
+    public void SetMoveInput(float input)
     {
         moveInput = input;
     }

@@ -20,6 +20,10 @@ public class MainMenuManager : MonoBehaviour
 
     public GameObject mobileControls;
 
+    // Showroom cars. Live in their own container next to the playable cars, so
+    // they have to be hidden on resume or the pick stays parked in the lot.
+    public GameObject menuCars;
+
     void Awake()
     {
         resumeButton.interactable = false;
@@ -70,6 +74,9 @@ public class MainMenuManager : MonoBehaviour
         selectMissionUI.SetActive(false);
         mobileControls.SetActive(false);
 
+        if (menuCars != null)
+            menuCars.SetActive(true);
+
         if (menuCamera != null)
             menuCamera.SetActive(true);
 
@@ -94,6 +101,9 @@ public class MainMenuManager : MonoBehaviour
         selectCarUI.SetActive(false);
         selectMissionUI.SetActive(false);
         mobileControls.SetActive(true);
+
+        if (menuCars != null)
+            menuCars.SetActive(false);
 
         if (menuCamera != null)
             menuCamera.SetActive(false);
