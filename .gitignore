@@ -73,3 +73,7 @@ Desktop.ini
 *~
 *.bak
 *.swp
+
+# Unity temp/debug folders
+.utmp/
+CarParkingGame_BurstDebugInformation_DoNotShip/
