@@ -26,6 +26,8 @@ namespace CarParkingGame.UI
         [SerializeField] private Color partialColor = new Color(0.95f, 0.75f, 0.2f);
         [SerializeField] private Color validColor = new Color(0.3f, 0.8f, 0.35f);
 
+        private ParkingState lastState = ParkingState.Outside;
+
         private MissionManager Missions => missionManager != null ? missionManager : MissionManager.Instance;
 
         private void OnEnable()
@@ -79,27 +81,52 @@ namespace CarParkingGame.UI
                 return;
             }
 
-            MissionDefinition definition = missions.ActiveMission;
+            // The limit comes from the manager, not the definition: challenge mode puts the
+            // same mission on a clock the definition knows nothing about.
+            float remaining = missions.RemainingSeconds;
 
-            if (definition == null || !definition.IsTimed)
+            if (remaining < 0f)
             {
                 return;
             }
 
-            float remaining = Mathf.Max(0f, definition.TimeLimitSeconds - missions.Tracker.ElapsedSeconds);
             timerLabel.text = FormatTime(remaining);
+        }
+
+        // The hint names whichever condition is currently blocking the park, and that
+        // changes while the player manoeuvres without the parking state changing, so it is
+        // refreshed per frame rather than only on the state event.
+        private void LateUpdate()
+        {
+            if (parkingHintLabel == null || lastState != ParkingState.Partial)
+            {
+                return;
+            }
+
+            MissionManager missions = Missions;
+
+            if (missions != null && missions.IsRunning)
+            {
+                parkingHintLabel.text = DescribeWhatIsMissing();
+            }
         }
 
         private void OnMissionStarted(MissionDefinition definition)
         {
+            MissionManager missions = Missions;
+
             if (missionNameLabel != null)
             {
-                missionNameLabel.text = $"{definition.MissionId:00}  {definition.DisplayName}";
+                string prefix = GameSession.Instance != null && GameSession.Instance.Mode == GameplayMode.Challenge
+                    ? $"STAGE {GameSession.Instance.ChallengeStage}/{MissionManager.BaseMissionCount}  "
+                    : $"{definition.MissionId:00}  ";
+
+                missionNameLabel.text = prefix + definition.DisplayName;
             }
 
             if (timerContainer != null)
             {
-                timerContainer.SetActive(definition.IsTimed);
+                timerContainer.SetActive(missions != null && missions.TimeLimitSeconds > 0f);
             }
 
             OnScoreChanged(Missions != null && Missions.Tracker != null ? Missions.Tracker.Score : 0);
@@ -135,6 +162,8 @@ namespace CarParkingGame.UI
 
         private void SetParkingFeedback(ParkingState state, float progress)
         {
+            lastState = state;
+
             if (parkingStateIndicator != null)
             {
                 parkingStateIndicator.color = state switch
@@ -159,11 +188,41 @@ namespace CarParkingGame.UI
 
             parkingHintLabel.text = state switch
             {
-                ParkingState.Partial => "Line the car up inside the bay",
+                ParkingState.Partial => DescribeWhatIsMissing(),
                 ParkingState.Holding => "Hold it...",
                 ParkingState.Complete => "Parked",
                 _ => string.Empty
             };
+        }
+
+        // "Line the car up inside the bay" was true but useless: it said nothing about
+        // which of the three conditions was failing, so a car that was inside and straight
+        // but still rolling looked like a bug. One sentence naming the actual blocker.
+        private string DescribeWhatIsMissing()
+        {
+            ParkingValidator validator = Missions != null ? Missions.ActiveValidator : null;
+
+            if (validator == null)
+            {
+                return "Line the car up inside the bay";
+            }
+
+            if (validator.LastContainment < 0.999f)
+            {
+                return "Get the whole car inside the bay";
+            }
+
+            if (validator.LastHeadingError > 20f)
+            {
+                return "Straighten up";
+            }
+
+            if (validator.LastSpeedKmh > 3f)
+            {
+                return "Come to a stop";
+            }
+
+            return "Almost - hold it still";
         }
 
         private void RefreshCoins()

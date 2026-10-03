@@ -4,10 +4,16 @@ using UnityEngine.UI;
 
 namespace CarParkingGame.UI
 {
-    // HUD buttons for the car's own controls. They resolve the car the player is currently
-    // driving on each press rather than being bound to one car in the Inspector, because
-    // the scene swaps between three cars and a bound reference would end up pointing at a
-    // car that is switched off.
+    // The ring of car controls around the brake pedal: camera, headlights, horn and the
+    // two indicators.
+    //
+    // They resolve the car the player is currently driving on each press rather than
+    // being bound to one car in the Inspector, because the scene swaps between three cars
+    // and a bound reference would end up pointing at a car that is switched off.
+    //
+    // Each button also reports its own state by tinting its icon, which a text caption
+    // could not do: with the indicators blinking and the headlights latched, "is this on?"
+    // is the question the player actually has.
     public class VehicleControlButtons : MonoBehaviour
     {
         [SerializeField] private Button headlightButton;
@@ -16,7 +22,17 @@ namespace CarParkingGame.UI
         [SerializeField] private Button rightIndicatorButton;
         [SerializeField] private Button cameraButton;
 
+        [Header("Icons")]
+        [SerializeField] private Image headlightIcon;
+        [SerializeField] private Image leftIndicatorIcon;
+        [SerializeField] private Image rightIndicatorIcon;
+        [SerializeField] private Text cameraModeLabel;
+
+        [SerializeField] private Color idleColor = new Color(1f, 1f, 1f, 0.85f);
+        [SerializeField] private Color activeColor = new Color(1f, 0.78f, 0.15f, 1f);
+
         private VehicleCameraDirector cameraDirector;
+        private VehicleLights trackedLights;
 
         private void Awake()
         {
@@ -46,44 +62,37 @@ namespace CarParkingGame.UI
             }
         }
 
+        private void OnDisable()
+        {
+            Untrack();
+        }
+
+        private void Update()
+        {
+            TrackActiveCar();
+            RefreshCameraLabel();
+        }
+
+        // ----- presses --------------------------------------------------------------------
+
         private void ToggleHeadlights()
         {
-            VehicleLights lights = FindOnActiveCar<VehicleLights>();
-
-            if (lights != null)
-            {
-                lights.ToggleHeadlights();
-            }
+            FindOnActiveCar<VehicleLights>()?.ToggleHeadlights();
         }
 
         private void SoundHorn()
         {
-            VehicleHorn horn = FindOnActiveCar<VehicleHorn>();
-
-            if (horn != null)
-            {
-                horn.Play();
-            }
+            FindOnActiveCar<VehicleHorn>()?.Play();
         }
 
         private void ToggleLeftIndicator()
         {
-            VehicleLights lights = FindOnActiveCar<VehicleLights>();
-
-            if (lights != null)
-            {
-                lights.ToggleIndicator(IndicatorSide.Left);
-            }
+            FindOnActiveCar<VehicleLights>()?.ToggleIndicator(IndicatorSide.Left);
         }
 
         private void ToggleRightIndicator()
         {
-            VehicleLights lights = FindOnActiveCar<VehicleLights>();
-
-            if (lights != null)
-            {
-                lights.ToggleIndicator(IndicatorSide.Right);
-            }
+            FindOnActiveCar<VehicleLights>()?.ToggleIndicator(IndicatorSide.Right);
         }
 
         private void CycleCamera()
@@ -93,9 +102,71 @@ namespace CarParkingGame.UI
                 cameraDirector = FindFirstObjectByType<VehicleCameraDirector>();
             }
 
-            if (cameraDirector != null)
+            cameraDirector?.CycleMode();
+            RefreshCameraLabel();
+        }
+
+        // ----- state feedback -------------------------------------------------------------
+
+        private void TrackActiveCar()
+        {
+            VehicleLights lights = FindOnActiveCar<VehicleLights>();
+
+            if (lights == trackedLights)
             {
-                cameraDirector.CycleMode();
+                return;
+            }
+
+            Untrack();
+            trackedLights = lights;
+
+            if (trackedLights != null)
+            {
+                trackedLights.StateChanged += RefreshLightState;
+            }
+
+            RefreshLightState();
+        }
+
+        private void Untrack()
+        {
+            if (trackedLights != null)
+            {
+                trackedLights.StateChanged -= RefreshLightState;
+                trackedLights = null;
+            }
+        }
+
+        private void RefreshLightState()
+        {
+            bool headlightsOn = trackedLights != null && trackedLights.HeadlightsOn;
+            IndicatorSide side = trackedLights != null ? trackedLights.Indicator : IndicatorSide.None;
+
+            Tint(headlightIcon, headlightsOn);
+            Tint(leftIndicatorIcon, side == IndicatorSide.Left);
+            Tint(rightIndicatorIcon, side == IndicatorSide.Right);
+        }
+
+        private void RefreshCameraLabel()
+        {
+            if (cameraModeLabel == null)
+            {
+                return;
+            }
+
+            if (cameraDirector == null)
+            {
+                cameraDirector = FindFirstObjectByType<VehicleCameraDirector>();
+            }
+
+            cameraModeLabel.text = cameraDirector != null ? cameraDirector.ModeCaption : string.Empty;
+        }
+
+        private void Tint(Image icon, bool active)
+        {
+            if (icon != null)
+            {
+                icon.color = active ? activeColor : idleColor;
             }
         }
 

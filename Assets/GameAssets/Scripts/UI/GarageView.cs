@@ -47,6 +47,8 @@ namespace CarParkingGame.UI
                 colorButtons[i]?.onClick.AddListener(() => OnColor(colorIndex));
             }
 
+            PaintSwatches();
+
             foreach (UpgradeRow row in upgradeRows ?? Array.Empty<UpgradeRow>())
             {
                 UpgradeRow captured = row;
@@ -184,6 +186,37 @@ namespace CarParkingGame.UI
                 if (row.button != null)
                 {
                     row.button.interactable = owned && !maxed && SaveManager.Data.coins >= cost;
+                }
+            }
+        }
+
+        // Each swatch shows the colour it applies. They were built as plain white discs and
+        // nothing ever coloured them, so the garage offered eight identical buttons.
+        private void PaintSwatches()
+        {
+            GarageManager garageManager = Garage;
+            CarColorPalette palette = garageManager != null ? garageManager.Palette : null;
+
+            if (colorButtons == null || palette == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < colorButtons.Length; i++)
+            {
+                Button swatch = colorButtons[i];
+
+                if (swatch == null)
+                {
+                    continue;
+                }
+
+                bool hasColor = palette.TryGetColor(i, out Color color);
+                swatch.gameObject.SetActive(hasColor);
+
+                if (hasColor && swatch.targetGraphic != null)
+                {
+                    swatch.targetGraphic.color = color;
                 }
             }
         }

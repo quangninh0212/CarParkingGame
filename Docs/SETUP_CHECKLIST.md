@@ -17,6 +17,44 @@ Do not go looking for the missing files or recreate them; they are not part of t
 
 ## Latest state (read this first)
 
+### Front end, modes and the four reported bugs
+
+The whole front end is now one canvas, `GameUI`, built by `Tools → Car Parking → Build Game UI`. The legacy `MainMenuCanvas`, `MissionInfo` and `MobileControls` canvases are switched **off**: the overlapping screens in the bug report were two live canvases drawing over each other, not a layout mistake.
+
+`GameSession` (on its own object in the scene) owns what the game is doing — menu, practice, challenge, free drive, paused — and switches the cameras, the driving controls, the showroom cars and the clock together. Nothing infers state from `Time.timeScale` any more.
+
+Three game modes, reached from **PLAY** or **GAME MODE** on the home screen:
+
+| Mode | What it does |
+| --- | --- |
+| Practice | One stage at a time, car placed on the start line, only that stage's props in the world. Clearing a stage unlocks the next. |
+| Challenge | All eight distinct bays standing at once, played in order on a per-stage clock (`GameSession.challengeSecondsPerStage`, 120s). The car is **not** teleported between stages: driving to the next bay is the mode, and an on-screen arrow points at it with the distance. |
+| Free drive | No missions, no timer, every mission's props hidden. |
+
+Missions 9–30 are clones of 1–8 at the same world positions, so a challenge run is only the eight distinct bays (`MissionManager.BaseMissionCount`).
+
+Four bugs from the report, and what was actually wrong:
+
+- **"Can't steer once the yellow bar shows."** The track's barriers are tagged `Cone`, and the legacy `MissionFailedHandler` froze the car with `SetVehicleEnabled(false)` the moment one was touched — so clipping a barrier while lining up left the player stuck. `MissionFailedHandler` and `ParkingTrigger` now stand down wherever a `GameSession` exists, and a collision costs score instead. The hint text also now names the condition that is actually blocking the park ("Get the whole car inside the bay" / "Straighten up" / "Come to a stop") rather than the unhelpful "Line the car up inside the bay".
+- **"The barriers can be driven through."** They had no colliders at all. The track pack ships one hand-made collision group, `oval_complete_colliders`, which covers the walls, garages and ground and nothing else. `Tools → Car Parking → Make Track Scenery Solid` adds 107 `MeshCollider`s across the barriers, tyre stacks, plastic blocks, lamp posts, pit wall, bridges, start lights and buildings. Trees and grandstands are deliberately left alone: they are out of reach and a collider each is a cost an Android build should not pay.
+- **"No car in the garage."** The garage panel was an opaque full-screen rectangle in front of a camera pointed at nothing. The panel is now a column down the left, and `ShowroomCameraRig` frames the showroom car — which is standing in the world already — in the space beside it. Both menu framings look from the same side of the showroom; round the other side there is a lamp post within a couple of metres of the car. The paint swatches are also coloured from the palette now; they used to be eight identical white discs.
+- **"The camera views are wrong."** Cockpit and look-back now share one eye point — the driver's head, measured per car from its own body bounds by `VehicleViewPoints` — and the rear view is that same seat yawed 180°. The old version used a fixed offset near the bonnet and a boom behind the boot.
+
+Headlamps are placed from each car's **body bounds** rather than its wheel positions, so the pair sits symmetrically on the real nose and tail at bumper height; the spot lights are dipped 10°. Re-run with `Tools → Car Parking → Dress Cars With Lights And Horn`.
+
+The HUD's car controls are five circular icon buttons on an arc over the brake pedal, with the indicators on the side they signal; the headlight and indicator icons light amber while active. Icons are generated as PNGs by `Tools → Car Parking → Generate UI Icons` (`Assets/GameAssets/Sprites/Icons`) — replace them with drawn art whenever it exists, the file names are the contract.
+
+**Rebuilding:** run the tools in this order, each of which opens and saves the gameplay scene:
+`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Game UI` → `Check Game UI`.
+`Build Game UI` is safe to re-run: it lifts SimpleInput's steering wheel, pedals and brake out of the canvas before deleting it and puts them back afterwards.
+
+**Still needs an Editor eyeball** (it cannot be checked from the command line):
+- The driver's-seat camera on each of the three cars — the eye point is measured, but whether it clears the roof line and the dashboard is a judgement call.
+- The headlamp spheres on each car. They are plain objects under `PlaceholderLights`; drag them if they sit proud of the bodywork.
+- Whether 120s per challenge stage is the right difficulty (`GameSession` → Challenge mode → Challenge Seconds Per Stage).
+
+### Missions
+
 - **All 30 missions exist in the scene and validate with no issues.** 9–30 are clones of 1–8 at the same positions (only one mission's environment is ever active), with bays sized by difficulty.
 - **Every bay was refitted** from measured geometry: the legacy triggers are thin end-line plates, and bays now extend from them along +forward. Select any `ParkingTrigger` and the cyan gizmo box should cover the painted bay — **this is the single most important thing to eyeball**. If a box sits on the wrong side of its end line, flip that one by hand.
 - Textures and the three heaviest meshes are compressed for Android; release APK is **80.6 MB** at `Builds/CarParkingGame-release.apk`. Look at the track for visible quality loss; revert with `git checkout -- Assets` if it is unacceptable.

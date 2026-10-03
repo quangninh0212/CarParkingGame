@@ -83,43 +83,31 @@ namespace CarParkingGame.UI
             }
         }
 
+        // Starting a mission means leaving the menu: the cameras, the driving controls and
+        // the clock all have to change together, which is GameSession's job. Doing any of
+        // it here is how the car used to end up frozen behind a menu that was still up.
         private void OnMissionSelected(int missionId)
         {
+            GameSession session = GameSession.Instance;
+
+            if (session != null)
+            {
+                session.StartPractice(missionId);
+                return;
+            }
+
             MissionManager manager = MissionManager.Instance;
 
             if (manager == null)
             {
-                Debug.LogError("[MissionSelectionView] No MissionManager in the scene; mission could not be started.");
+                Debug.LogError("[MissionSelectionView] No GameSession or MissionManager in the scene; mission could not be started.");
                 return;
             }
 
             if (manager.StartMission(missionId))
             {
                 gameObject.SetActive(false);
-                LeaveMenu();
-            }
-        }
-
-        // The list is opened from the legacy main menu, which pauses with
-        // Time.timeScale = 0 and hides the driving controls. Without handing back to
-        // it, a mission would start with the car frozen behind the menu.
-        private void LeaveMenu()
-        {
-            MainMenuManager menu = FindFirstObjectByType<MainMenuManager>();
-
-            if (menu == null)
-            {
                 Time.timeScale = 1f;
-                return;
-            }
-
-            menu.ResumeGame();
-
-            // ResumeGame shows the legacy GameManager's mission caption, which names
-            // the legacy mission rather than the one just started.
-            if (menu.missionInformation != null)
-            {
-                menu.missionInformation.SetActive(false);
             }
         }
     }

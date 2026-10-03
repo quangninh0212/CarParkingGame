@@ -117,23 +117,50 @@ namespace CarParkingGame.EditorTools
             lampRoot.transform.localPosition = Vector3.zero;
             lampRoot.transform.localRotation = Quaternion.identity;
 
-            float lampSize = measurements.halfWidth * 0.22f;
-            float sideX = measurements.halfWidth * 0.72f;
-            float cornerX = measurements.halfWidth * 0.95f;
-            float frontZ = measurements.frontZ + measurements.overhang;
-            float rearZ = measurements.rearZ - measurements.overhang;
-            float lampY = measurements.wheelY + measurements.halfWidth * 0.55f;
+            // Lamps are placed on the bodywork, not on the wheel track.
+            //
+            // Deriving them from the wheels put both lamps symmetrically about the car's
+            // pivot, which is not the middle of the body on these models, and guessed the
+            // nose as "front axle plus a quarter of the wheelbase" - so the pair sat off
+            // centre and floated clear of the bonnet. The body's own bounds give the real
+            // nose, tail, waistline and centre line.
+            bool haveBody = CarParkingGame.Vehicle.VehicleViewPoints.TryMeasureBodyBounds(car.transform, out Bounds body);
 
-            GameObject headlightLeft = CreateLamp(lampRoot.transform, "HeadlightLeft", new Vector3(-sideX, lampY, frontZ), lampSize, headlightMaterial);
-            GameObject headlightRight = CreateLamp(lampRoot.transform, "HeadlightRight", new Vector3(sideX, lampY, frontZ), lampSize, headlightMaterial);
+            if (!haveBody)
+            {
+                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' has no measurable body mesh; lamps fall back to the wheel geometry.", car);
+            }
 
-            GameObject brakeLeft = CreateLamp(lampRoot.transform, "BrakeLeft", new Vector3(-sideX, lampY, rearZ), lampSize, brakeMaterial);
-            GameObject brakeRight = CreateLamp(lampRoot.transform, "BrakeRight", new Vector3(sideX, lampY, rearZ), lampSize, brakeMaterial);
+            float centreX = haveBody ? body.center.x : 0f;
+            float halfBodyWidth = haveBody ? body.extents.x : measurements.halfWidth;
+            float noseZ = haveBody ? body.max.z : measurements.frontZ + measurements.overhang;
+            float tailZ = haveBody ? body.min.z : measurements.rearZ - measurements.overhang;
 
-            GameObject indicatorFrontLeft = CreateLamp(lampRoot.transform, "IndicatorFrontLeft", new Vector3(-cornerX, lampY, frontZ * 0.95f), lampSize * 0.8f, indicatorMaterial);
-            GameObject indicatorRearLeft = CreateLamp(lampRoot.transform, "IndicatorRearLeft", new Vector3(-cornerX, lampY, rearZ * 0.95f), lampSize * 0.8f, indicatorMaterial);
-            GameObject indicatorFrontRight = CreateLamp(lampRoot.transform, "IndicatorFrontRight", new Vector3(cornerX, lampY, frontZ * 0.95f), lampSize * 0.8f, indicatorMaterial);
-            GameObject indicatorRearRight = CreateLamp(lampRoot.transform, "IndicatorRearRight", new Vector3(cornerX, lampY, rearZ * 0.95f), lampSize * 0.8f, indicatorMaterial);
+            // Lamps sit a little proud of the bodywork so they are not buried in the mesh.
+            const float Proud = 0.04f;
+
+            float lampSize = halfBodyWidth * 0.2f;
+            float sideX = halfBodyWidth * 0.66f;
+            float cornerX = halfBodyWidth * 0.92f;
+            float frontZ = noseZ + Proud;
+            float rearZ = tailZ - Proud;
+
+            // Headlamp height: a third of the way up the body, which is where a bumper
+            // lamp sits on all three of these cars.
+            float lampY = haveBody
+                ? body.min.y + body.size.y * 0.34f
+                : measurements.wheelY + measurements.halfWidth * 0.55f;
+
+            GameObject headlightLeft = CreateLamp(lampRoot.transform, "HeadlightLeft", new Vector3(centreX - sideX, lampY, frontZ), lampSize, headlightMaterial);
+            GameObject headlightRight = CreateLamp(lampRoot.transform, "HeadlightRight", new Vector3(centreX + sideX, lampY, frontZ), lampSize, headlightMaterial);
+
+            GameObject brakeLeft = CreateLamp(lampRoot.transform, "BrakeLeft", new Vector3(centreX - sideX, lampY, rearZ), lampSize, brakeMaterial);
+            GameObject brakeRight = CreateLamp(lampRoot.transform, "BrakeRight", new Vector3(centreX + sideX, lampY, rearZ), lampSize, brakeMaterial);
+
+            GameObject indicatorFrontLeft = CreateLamp(lampRoot.transform, "IndicatorFrontLeft", new Vector3(centreX - cornerX, lampY, frontZ - lampSize), lampSize * 0.8f, indicatorMaterial);
+            GameObject indicatorRearLeft = CreateLamp(lampRoot.transform, "IndicatorRearLeft", new Vector3(centreX - cornerX, lampY, rearZ + lampSize), lampSize * 0.8f, indicatorMaterial);
+            GameObject indicatorFrontRight = CreateLamp(lampRoot.transform, "IndicatorFrontRight", new Vector3(centreX + cornerX, lampY, frontZ - lampSize), lampSize * 0.8f, indicatorMaterial);
+            GameObject indicatorRearRight = CreateLamp(lampRoot.transform, "IndicatorRearRight", new Vector3(centreX + cornerX, lampY, rearZ + lampSize), lampSize * 0.8f, indicatorMaterial);
 
             // Two real spot lights only for the headlights. They are switched off unless the
             // player turns the headlights on, and they are the one genuinely expensive part
@@ -170,6 +197,7 @@ namespace CarParkingGame.EditorTools
             hornSerialized.ApplyModifiedProperties();
 
             WirePaintTarget(car, lampRoot.transform);
+            MeasureViewPoints(car);
 
             Debug.Log($"[VehicleDressingTool] '{car.name}': 8 lamps placed from its own wheel geometry (track {measurements.halfWidth * 2f:0.00}m, wheelbase {measurements.frontZ - measurements.rearZ:0.00}m), horn wired.", car);
         }
@@ -231,6 +259,23 @@ namespace CarParkingGame.EditorTools
             serialized.ApplyModifiedProperties();
 
             Debug.Log($"[VehicleDressingTool] '{car.name}': {bodyRenderers.Count} paintable renderer(s) assigned.", car);
+        }
+
+        // Where the driver sits, measured now so the cockpit and look-back cameras do not
+        // have to work it out on the first frame of play.
+        private static void MeasureViewPoints(CarController car)
+        {
+            var points = car.GetComponent<CarParkingGame.Vehicle.VehicleViewPoints>();
+
+            if (points == null)
+            {
+                points = car.gameObject.AddComponent<CarParkingGame.Vehicle.VehicleViewPoints>();
+            }
+
+            points.Measure();
+            EditorUtility.SetDirty(points);
+
+            Debug.Log($"[VehicleDressingTool] '{car.name}': driver's eye at {points.DriverEyeLocalPosition:0.00} in car space.", car);
         }
 
         private struct CarMeasurements
@@ -331,7 +376,10 @@ namespace CarParkingGame.EditorTools
             var lightObject = new GameObject("Spot");
             lightObject.transform.SetParent(lamp, false);
             lightObject.transform.localPosition = Vector3.zero;
-            lightObject.transform.localRotation = Quaternion.identity;
+
+            // Dipped, like a real low beam. Aimed dead level the cone washed out over the
+            // horizon and lit nothing the player could see.
+            lightObject.transform.localRotation = Quaternion.Euler(10f, 0f, 0f);
 
             var light = lightObject.AddComponent<Light>();
             light.type = LightType.Spot;

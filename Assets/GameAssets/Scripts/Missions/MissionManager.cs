@@ -8,20 +8,20 @@ using UnityEngine;
 
 namespace CarParkingGame.Missions
 {
-    // Runs one practice mission: spawns the car, configures the parking validator from
-    // the mission's definition, tracks score and time, then writes the result to the
-    // save file and pays out coins exactly once.
+    // Runs one mission: configures the parking validator from the mission's definition,
+    // tracks score and time, then writes the result to the save file and pays out coins
+    // exactly once.
     //
-    // Not wired into the gameplay scene yet - the legacy GameManager still owns mission
-    // flow. See Docs/SETUP_CHECKLIST.md for the handover steps.
+    // How the mission is presented - teleport to the start line or not, hide the other
+    // missions' props or not, which clock to run - comes in per launch through
+    // MissionLaunchOptions, so practice and challenge share this one runner.
     public class MissionManager : MonoBehaviour
     {
+        public const int BaseMissionCount = 8;
+
         public static MissionManager Instance { get; private set; }
 
         [SerializeField] private ScoreRules defaultScoreRules;
-
-        [Tooltip("Hide every other mission's environment container while a mission runs.")]
-        [SerializeField] private bool isolateActiveEnvironment = true;
 
         [Tooltip("Which mission the Inspector's context-menu test entry starts. Only used in the Editor.")]
         [SerializeField] private int debugMissionId = 1;
@@ -30,12 +30,11 @@ namespace CarParkingGame.Missions
         private readonly List<MissionAuthoring> registeredMissions = new List<MissionAuthoring>();
 
         private MissionAuthoring activeMission;
+        private MissionLaunchOptions activeOptions;
         private MissionScoreTracker tracker;
         private ParkingValidator validator;
         private VehicleCollisionReporter reporter;
         private CarController vehicle;
-        private ParkingTrigger[] legacyTriggers;
-        private MissionFailedHandler[] legacyFailHandlers;
         private bool running;
 
         public event Action<MissionDefinition> MissionStarted;
@@ -46,8 +45,33 @@ namespace CarParkingGame.Missions
 
         public bool IsRunning => running;
         public MissionDefinition ActiveMission => activeMission != null ? activeMission.Definition : null;
+        public ParkingZone ActiveZone => activeMission != null ? activeMission.ParkingZone : null;
+        public ParkingValidator ActiveValidator => validator;
         public MissionScoreTracker Tracker => tracker;
         public IReadOnlyList<MissionAuthoring> RegisteredMissions => registeredMissions;
+
+        // The clock the HUD should show, or a negative number when this mission is untimed.
+        public float TimeLimitSeconds
+        {
+            get
+            {
+                if (activeMission == null)
+                {
+                    return -1f;
+                }
+
+                if (activeOptions.timeLimitOverride > 0f)
+                {
+                    return activeOptions.timeLimitOverride;
+                }
+
+                return activeMission.Definition.IsTimed ? activeMission.Definition.TimeLimitSeconds : -1f;
+            }
+        }
+
+        public float RemainingSeconds => TimeLimitSeconds <= 0f || tracker == null
+            ? -1f
+            : Mathf.Max(0f, TimeLimitSeconds - tracker.ElapsedSeconds);
 
         private void Awake()
         {
@@ -70,8 +94,6 @@ namespace CarParkingGame.Missions
         }
 
 #if UNITY_EDITOR
-        // Lets a mission be started from the component's context menu while playing, so the
-        // new parking/scoring pipeline can be tested before any selection UI exists.
         [ContextMenu("Debug: Start Mission")]
         private void DebugStartMission()
         {
@@ -82,13 +104,12 @@ namespace CarParkingGame.Missions
             }
 
             RebuildRegistry();
-            StartMission(debugMissionId);
+            StartMission(debugMissionId, MissionLaunchOptions.Practice);
         }
 
         // Drops the car dead centre in the bay, facing the parked heading, at rest, so the
         // whole mission -> result -> reward -> next mission loop can be exercised on a
-        // laptop without having to drive. It proves the pipeline, not the bay placement:
-        // the car is put exactly where the bay is, so it cannot catch a misplaced bay.
+        // laptop without having to drive.
         [ContextMenu("Debug: Snap Car Into Bay (P)")]
         private void DebugSnapIntoBay()
         {
@@ -120,8 +141,6 @@ namespace CarParkingGame.Missions
             {
                 validator.EditorMarkReversedIn();
             }
-
-            Debug.Log($"[MissionManager] Snapped the car into mission {activeMission.MissionId}'s bay. It should complete after the {activeMission.Definition.HoldSeconds:0.0}s hold.");
         }
 
         // Checked on both input backends, for the same reason as VehicleInput.ReadKeyboard.
@@ -138,18 +157,6 @@ namespace CarParkingGame.Missions
 #else
             return false;
 #endif
-        }
-
-        [ContextMenu("Debug: Log Registered Missions")]
-        private void DebugLogRegisteredMissions()
-        {
-            RebuildRegistry();
-            Debug.Log($"[MissionManager] {registeredMissions.Count} mission(s) set up in this scene.");
-
-            foreach (MissionAuthoring mission in registeredMissions)
-            {
-                Debug.Log($"  Mission {mission.MissionId}: '{mission.Definition.DisplayName}' ({mission.Definition.ParkingType}) on '{mission.name}'", mission);
-            }
         }
 #endif
 
@@ -190,7 +197,33 @@ namespace CarParkingGame.Missions
             return missionsById.TryGetValue(missionId, out MissionAuthoring mission) ? mission : null;
         }
 
+        // Turns every mission's props off at once, for free roam.
+        public void SetAllEnvironmentsActive(bool active)
+        {
+            for (int i = 0; i < registeredMissions.Count; i++)
+            {
+                registeredMissions[i].SetEnvironmentActive(active);
+            }
+        }
+
+        // Only the originals: missions 9-30 are clones sitting at the same world positions
+        // as 1-8, so they can never be shown at the same time as their source. Challenge
+        // mode dresses the whole map, which means exactly these eight.
+        public void SetBaseEnvironmentsActive(bool active)
+        {
+            for (int i = 0; i < registeredMissions.Count; i++)
+            {
+                MissionAuthoring mission = registeredMissions[i];
+                mission.SetEnvironmentActive(active && mission.MissionId <= BaseMissionCount);
+            }
+        }
+
         public bool StartMission(int missionId)
+        {
+            return StartMission(missionId, MissionLaunchOptions.Practice);
+        }
+
+        public bool StartMission(int missionId, MissionLaunchOptions options)
         {
             MissionAuthoring mission = GetMission(missionId);
 
@@ -216,8 +249,9 @@ namespace CarParkingGame.Missions
 
             StopActiveMission();
             activeMission = mission;
+            activeOptions = options;
 
-            if (isolateActiveEnvironment)
+            if (options.isolateEnvironment)
             {
                 for (int i = 0; i < registeredMissions.Count; i++)
                 {
@@ -231,21 +265,18 @@ namespace CarParkingGame.Missions
 
             MissionDefinition definition = mission.Definition;
 
-            PlaceVehicleAtStart(mission.StartPoint);
+            if (options.teleportToStart)
+            {
+                PlaceVehicleAtStart(mission.StartPoint);
+            }
+
             SetUpTracker(definition);
             SetUpValidator(mission, definition);
             SetUpCollisionReporting();
 
-            // The legacy trigger would instantly complete the mission on contact and the
-            // legacy cone handler would instantly fail it, both bypassing the new
-            // validation and scoring. They are switched off for the duration and restored
-            // afterwards, so the old menu flow still works as before.
-            SetLegacyHandlersEnabled(false);
-
             running = true;
             vehicle.SetVehicleEnabled(true);
 
-            GameFlowManager.Instance?.SetGameMode(GameMode.Practice);
             GameFlowManager.Instance?.SetGameState(GameState.Playing);
 
             MissionStarted?.Invoke(definition);
@@ -260,6 +291,19 @@ namespace CarParkingGame.Missions
             }
 
             Finish(false, MissionFailReason.Aborted);
+        }
+
+        // Stops the mission without producing a result, for walking away to the menu.
+        public void CancelMission()
+        {
+            if (!running)
+            {
+                return;
+            }
+
+            StopActiveMission();
+            running = false;
+            activeMission = null;
         }
 
         private void Update()
@@ -278,9 +322,9 @@ namespace CarParkingGame.Missions
 
             tracker.Tick(Time.deltaTime);
 
-            MissionDefinition definition = activeMission.Definition;
+            float limit = TimeLimitSeconds;
 
-            if (definition.IsTimed && definition.FailOnTimeout && tracker.ElapsedSeconds > definition.TimeLimitSeconds)
+            if (limit > 0f && activeOptions.failOnTimeout && tracker.ElapsedSeconds > limit)
             {
                 Finish(false, MissionFailReason.TimeExpired);
                 return;
@@ -393,7 +437,8 @@ namespace CarParkingGame.Missions
         private void Finish(bool parked, MissionFailReason failReason)
         {
             MissionDefinition definition = activeMission.Definition;
-            int overtimePenalty = parked ? tracker.ApplyOvertimePenalty(definition.TimeLimitSeconds) : 0;
+            float limit = TimeLimitSeconds;
+            int overtimePenalty = parked && limit > 0f ? tracker.ApplyOvertimePenalty(limit) : 0;
 
             bool success = parked && !tracker.IsFailing;
 
@@ -420,13 +465,7 @@ namespace CarParkingGame.Missions
             }
 
             StopActiveMission();
-            SetLegacyHandlersEnabled(true);
             running = false;
-
-            // Logged so the result is observable before any result UI is wired up.
-            Debug.Log(success
-                ? $"[MissionManager] Mission {result.missionId} complete - score {result.score}, {result.stars} star(s), {result.timeSeconds:0.0}s, {result.collisions} collision(s), +{result.coinsAwarded} coins{(result.isNewBest ? " (new best)" : string.Empty)}"
-                : $"[MissionManager] Mission {result.missionId} failed - {result.FailReasonText} (score {result.score})");
 
             vehicle?.SetVehicleEnabled(false);
             GameFlowManager.Instance?.SetGameState(GameState.Result);
@@ -489,35 +528,15 @@ namespace CarParkingGame.Missions
             }
         }
 
-        private void SetLegacyHandlersEnabled(bool enabled)
-        {
-            legacyTriggers ??= FindObjectsByType<ParkingTrigger>(
-                FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-
-            legacyFailHandlers ??= FindObjectsByType<MissionFailedHandler>(
-                FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-
-            foreach (ParkingTrigger trigger in legacyTriggers)
-            {
-                if (trigger != null)
-                {
-                    trigger.enabled = enabled;
-                }
-            }
-
-            foreach (MissionFailedHandler handler in legacyFailHandlers)
-            {
-                if (handler != null)
-                {
-                    handler.enabled = enabled;
-                }
-            }
-        }
-
         private static CarController ResolveActiveVehicle()
         {
+            CarController current = ActiveVehicleLocator.Current;
+
+            if (current != null && current.gameObject.activeInHierarchy)
+            {
+                return current;
+            }
+
             CarController[] controllers = FindObjectsByType<CarController>(
                 FindObjectsInactive.Exclude,
                 FindObjectsSortMode.None);

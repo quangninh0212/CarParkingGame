@@ -10,6 +10,14 @@ public class CarSelection : MonoBehaviour
 
     void Start()
     {
+        // GarageManager owns which car is shown wherever a GameSession exists. Both
+        // scripts activating children of the same container fought over the showroom.
+        if (CarParkingGame.Core.GameSession.Exists)
+        {
+            enabled = false;
+            return;
+        }
+
         allCars = new GameObject[allCarsContainer.transform.childCount];
 
         for (int i = 0; i < allCarsContainer.transform.childCount; i++)

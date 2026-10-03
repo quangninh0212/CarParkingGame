@@ -35,6 +35,14 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
+        // GameSession owns mission flow wherever it exists; this would otherwise also
+        // activate a mission area and teleport the cars behind its back.
+        if (CarParkingGame.Core.GameSession.Exists)
+        {
+            enabled = false;
+            return;
+        }
+
         LoadProgress();
         ShowMissionTextForCurrentMission();
         SetActiveMissionArea();

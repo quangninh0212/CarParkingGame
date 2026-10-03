@@ -1,6 +1,14 @@
+using CarParkingGame.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
+// Superseded by the scoring system, which charges points for a collision instead of
+// ending the run on contact.
+//
+// This is the bug that made missions unfinishable: the track's barriers are tagged
+// "Cone", so clipping one while lining the car up froze the car through
+// SetVehicleEnabled(false) and left the player unable to finish the park. Wherever a
+// GameSession exists this component stands down, and cones cost score instead.
 public class MissionFailedHandler : MonoBehaviour
 {
     public GameObject missionFailedUI;
@@ -9,15 +17,36 @@ public class MissionFailedHandler : MonoBehaviour
 
     void Start()
     {
-        missionFailedUI.SetActive(false);
-        retryButton.onClick.AddListener(RetryMission);
+        if (GameSession.Exists)
+        {
+            enabled = false;
+            return;
+        }
+
+        if (missionFailedUI != null)
+        {
+            missionFailedUI.SetActive(false);
+        }
+
+        if (retryButton != null)
+        {
+            retryButton.onClick.AddListener(RetryMission);
+        }
     }
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (GameSession.Exists)
+        {
+            return;
+        }
+
         if (collision.gameObject.CompareTag("Cone"))
         {
-            missionFailedUI.SetActive(true);
+            if (missionFailedUI != null)
+            {
+                missionFailedUI.SetActive(true);
+            }
 
             foreach (var car in carControllers)
             {
@@ -44,7 +73,10 @@ public class MissionFailedHandler : MonoBehaviour
 
         GameManager.Instance.SpawnPlayerAtMissionStart();
 
-        missionFailedUI.SetActive(false);
+        if (missionFailedUI != null)
+        {
+            missionFailedUI.SetActive(false);
+        }
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;

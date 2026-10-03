@@ -10,20 +10,35 @@ namespace CarParkingGame.Vehicle
         Rear
     }
 
-    // Cycles between the existing follow camera, a cockpit view and a rear/reversing view.
+    // Cycles between the existing follow camera, a driver's-seat view and a
+    // driver's-seat view turned to look out of the back window.
     //
-    // Third person is not reimplemented: the existing CarCameraController stays in charge
-    // of it, so that view behaves exactly as it does today. The other two modes park the
-    // camera rigidly on the car, which is what an interior or reversing view should do.
+    // Both seated views share one eye point - the driver's head - because that is what
+    // "look forward" and "look behind" mean in a car. The previous version put the
+    // forward view on a fixed offset near the bonnet and the reversing view on a boom
+    // behind the boot, so neither read as sitting in the car.
+    //
+    // Third person is not reimplemented: CarCameraController stays in charge of it, so
+    // that view behaves exactly as it does today.
     public class VehicleCameraDirector : MonoBehaviour
     {
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private CarCameraController legacyFollowCamera;
-        [SerializeField] private Vector3 cockpitOffset = new Vector3(0.35f, 1.1f, 0.15f);
-        [SerializeField] private Vector3 rearOffset = new Vector3(0f, 1.5f, -2.6f);
-        [SerializeField] private float rearPitchDegrees = 8f;
+
+        [Tooltip("Looking back over your shoulder is a slightly higher, further back seat position.")]
+        [SerializeField] private Vector3 rearViewNudge = new Vector3(0f, 0.06f, -0.15f);
+
+        [Tooltip("Both seated views look slightly down, the way a driver does.")]
+        [SerializeField] private float seatedPitchDegrees = 4f;
+
+        [Tooltip("Near clip while seated, so the car's own bodywork does not fill the view.")]
+        [SerializeField] private float seatedNearClip = 0.05f;
 
         private VehicleCameraMode mode = VehicleCameraMode.ThirdPerson;
+        private Camera cameraComponent;
+        private float authoredNearClip = 0.3f;
+        private CarController measuredCar;
+        private Vector3 eyeLocalPosition = new Vector3(-0.35f, 1.1f, 0.1f);
 
         public VehicleCameraMode Mode => mode;
 
@@ -34,6 +49,16 @@ namespace CarParkingGame.Vehicle
             if (cameraTransform == null && legacyFollowCamera != null)
             {
                 cameraTransform = legacyFollowCamera.transform;
+            }
+
+            if (cameraTransform != null)
+            {
+                cameraComponent = cameraTransform.GetComponent<Camera>();
+            }
+
+            if (cameraComponent != null)
+            {
+                authoredNearClip = cameraComponent.nearClipPlane;
             }
 
             ApplyMode();
@@ -67,11 +92,25 @@ namespace CarParkingGame.Vehicle
             ModeChanged?.Invoke(mode);
         }
 
+        public string ModeCaption => mode switch
+        {
+            VehicleCameraMode.Cockpit => "DRIVER",
+            VehicleCameraMode.Rear => "LOOK BACK",
+            _ => "FOLLOW"
+        };
+
         private void ApplyMode()
         {
+            bool thirdPerson = mode == VehicleCameraMode.ThirdPerson;
+
             if (legacyFollowCamera != null)
             {
-                legacyFollowCamera.enabled = mode == VehicleCameraMode.ThirdPerson;
+                legacyFollowCamera.enabled = thirdPerson;
+            }
+
+            if (cameraComponent != null)
+            {
+                cameraComponent.nearClipPlane = thirdPerson ? authoredNearClip : seatedNearClip;
             }
         }
 
@@ -90,19 +129,40 @@ namespace CarParkingGame.Vehicle
             }
 
             Transform body = car.transform;
+            Vector3 eye = ResolveEyeLocalPosition(car);
 
-            if (mode == VehicleCameraMode.Cockpit)
+            if (mode == VehicleCameraMode.Rear)
             {
-                cameraTransform.SetPositionAndRotation(body.TransformPoint(cockpitOffset), body.rotation);
-                return;
+                eye += rearViewNudge;
             }
 
-            Vector3 position = body.TransformPoint(rearOffset);
-            Quaternion lookBackwards = Quaternion.LookRotation(-body.forward, Vector3.up);
+            // Yawed 180 degrees for the rear view rather than aimed with LookRotation:
+            // turning in place is what a driver does, and it keeps roll tied to the car.
+            Quaternion facing = body.rotation
+                                * Quaternion.Euler(seatedPitchDegrees, mode == VehicleCameraMode.Rear ? 180f : 0f, 0f);
 
-            cameraTransform.SetPositionAndRotation(
-                position,
-                lookBackwards * Quaternion.Euler(rearPitchDegrees, 0f, 0f));
+            cameraTransform.SetPositionAndRotation(body.TransformPoint(eye), facing);
+        }
+
+        private Vector3 ResolveEyeLocalPosition(CarController car)
+        {
+            if (measuredCar == car)
+            {
+                return eyeLocalPosition;
+            }
+
+            measuredCar = car;
+
+            var points = car.GetComponent<VehicleViewPoints>();
+
+            if (points == null)
+            {
+                points = car.gameObject.AddComponent<VehicleViewPoints>();
+                points.Measure();
+            }
+
+            eyeLocalPosition = points.DriverEyeLocalPosition;
+            return eyeLocalPosition;
         }
     }
 }

@@ -1,3 +1,4 @@
+using CarParkingGame.Core;
 using CarParkingGame.Missions;
 using UnityEngine;
 using UnityEngine.UI;
@@ -152,6 +153,15 @@ namespace CarParkingGame.UI
 
         private bool HasMission(int missionId)
         {
+            GameSession session = GameSession.Instance;
+
+            // A challenge run is only the eight distinct bays in the map; missions 9-30
+            // are clones of those, standing at the same world positions.
+            if (session != null && session.Mode == GameplayMode.Challenge)
+            {
+                return missionId <= MissionManager.BaseMissionCount;
+            }
+
             if (catalog != null && catalog.Find(missionId) == null)
             {
                 return false;
@@ -161,21 +171,65 @@ namespace CarParkingGame.UI
             return missions != null && missions.GetMission(missionId) != null;
         }
 
+        // "Next" means the next stage of the run in challenge mode and the next mission on
+        // the ladder in practice, so the session is asked rather than assumed.
         private void StartNextMission()
         {
             HideAll();
+
+            GameSession session = GameSession.Instance;
+
+            if (session != null && session.Mode == GameplayMode.Challenge)
+            {
+                if (!session.AdvanceChallenge())
+                {
+                    session.ReturnToMenu();
+                }
+
+                return;
+            }
+
+            if (session != null)
+            {
+                session.StartPractice(lastMissionId + 1);
+                return;
+            }
+
             Missions?.StartMission(lastMissionId + 1);
         }
 
         private void ReplayMission()
         {
             HideAll();
+
+            GameSession session = GameSession.Instance;
+
+            if (session != null && session.Mode == GameplayMode.Challenge)
+            {
+                session.RestartChallengeStage();
+                return;
+            }
+
+            if (session != null)
+            {
+                session.StartPractice(lastMissionId);
+                return;
+            }
+
             Missions?.StartMission(lastMissionId);
         }
 
         private void ReturnToMenu()
         {
             HideAll();
+
+            GameSession session = GameSession.Instance;
+
+            if (session != null)
+            {
+                session.ReturnToMenu();
+                return;
+            }
 
             if (mainMenu != null)
             {

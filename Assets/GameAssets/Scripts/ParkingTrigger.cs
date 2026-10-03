@@ -1,6 +1,11 @@
+using CarParkingGame.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
+// Superseded by MissionManager + ParkingValidator. It stays in the project only so that
+// scenes which still carry it keep working; wherever a GameSession exists it stands down
+// completely, because "touching this trigger ends the mission" bypasses the real parking
+// check and freezes the car.
 public class ParkingTrigger : MonoBehaviour
 {
     public GameObject missionPassedUI;
@@ -12,13 +17,26 @@ public class ParkingTrigger : MonoBehaviour
 
     void Start()
     {
-        missionPassedUI.SetActive(false);
-        nextMissionButton.onClick.AddListener(NextMission);
+        if (GameSession.Exists)
+        {
+            enabled = false;
+            return;
+        }
+
+        if (missionPassedUI != null)
+        {
+            missionPassedUI.SetActive(false);
+        }
+
+        if (nextMissionButton != null)
+        {
+            nextMissionButton.onClick.AddListener(NextMission);
+        }
     }
 
     void OnTriggerEnter(Collider other)
     {
-        if (missionCompleted) return;
+        if (missionCompleted || GameSession.Exists) return;
 
         if (isReverseMission)
         {
