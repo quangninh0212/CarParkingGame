@@ -52,7 +52,7 @@ public class ParkingTrigger : MonoBehaviour
         {
             if (car != null)
             {
-                car.maxAcceleration = 0;
+                car.SetVehicleEnabled(false);
             }
         }
 
@@ -66,7 +66,7 @@ public class ParkingTrigger : MonoBehaviour
         {
             if (car != null)
             {
-                car.maxAcceleration = 5;
+                car.SetVehicleEnabled(true);
             }
         }
 

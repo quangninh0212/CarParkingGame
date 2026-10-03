@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78c2aad317ef67b4ab3ca274989c5bbc, type: 3}
+  m_Name: hot_rod
+  m_EditorClassIdentifier: 
+  carId: hot_rod
+  displayName: Hot Rod
+  purchasePrice: 3000
+  carIndex: 1
+  thumbnail: {fileID: 0}
+  topSpeedRating: 4
+  accelerationRating: 4
+  brakingRating: 3
+  handlingRating: 3

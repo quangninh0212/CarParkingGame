@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 08d920d792398934dbe4b6b4830b43ad, type: 3}
+  m_Name: DefaultScoreRules
+  m_EditorClassIdentifier: 
+  startingScore: 100
+  collisionPenalties:
+  - colliderTag: Cone
+    points: 3
+  - colliderTag: Barrier
+    points: 5
+  - colliderTag: Vehicle
+    points: 10
+  defaultCollisionPenalty: 5
+  leftMissionAreaPenalty: 5
+  misalignedParkingPenalty: 5
+  overtimePenaltyPerSecond: 1
+  maxOvertimePenalty: 20
+  collisionCooldownSeconds: 0.75
+  lightContactImpulse: 2
+  heavyContactImpulse: 8
+  threeStarScore: 90
+  twoStarScore: 70
+  oneStarScore: 50
