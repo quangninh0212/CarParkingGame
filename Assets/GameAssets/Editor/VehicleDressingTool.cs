@@ -199,6 +199,7 @@ namespace CarParkingGame.EditorTools
 
             WirePaintTarget(car, lampRoot.transform);
             MeasureViewPoints(car);
+            FitBodyCollider(car);
 
             Debug.Log($"[VehicleDressingTool] '{car.name}': 8 lamps placed from its own wheel geometry (track {measurements.halfWidth * 2f:0.00}m, wheelbase {measurements.frontZ - measurements.rearZ:0.00}m), horn wired.", car);
         }
@@ -290,6 +291,112 @@ namespace CarParkingGame.EditorTools
             EditorUtility.SetDirty(points);
 
             Debug.Log($"[VehicleDressingTool] '{car.name}': driver's eye at {points.DriverEyeLocalPosition:0.00}, look-back at {points.RearViewLocalPosition:0.00}.", car);
+        }
+
+        // The name the fitted collider is given, so re-running replaces it rather than
+        // stacking a second one on the car.
+        private const string BodyColliderName = "BodyCollider";
+
+        // Clearance kept under the fitted collider, measured from where the tyres touch the
+        // road. The suspension travels 0.3m and rests at the middle of its travel, so the
+        // body can drop another 0.15m under load; 0.2m leaves the collider clear of the
+        // road even then, and a collider that catches the road is a car that cannot move.
+        private const float RideHeightClearance = 0.2f;
+
+        // Gives the car a collision box that matches its bodywork.
+        //
+        // This is why driving into a cone did nothing. The cars' authored boxes cover only
+        // the upper part of the body: on the Classic the box starts 0.61m above the road,
+        // on the Hot Rod 0.39m, on the Muscle 0.29m - while the cones are 0.33m tall and
+        // the painted bay plates 0.09m. The car was passing over them with nothing of it
+        // low enough to touch. It was never a missing collider on the props.
+        //
+        // The authored boxes are left alone: they carry the Player and Reverse tags the
+        // legacy parking triggers match on, and several colliders on one rigidbody is the
+        // normal arrangement.
+        private static void FitBodyCollider(CarController car)
+        {
+            if (!CarParkingGame.Vehicle.VehicleViewPoints.TryMeasureBodyBounds(car.transform, out Bounds body))
+            {
+                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' has no measurable body mesh; its collision box was left as authored.", car);
+                return;
+            }
+
+            if (!TryMeasureGroundLine(car, out float groundLocalY))
+            {
+                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' has no usable WheelColliders, so its ride height is unknown.", car);
+                return;
+            }
+
+            Transform existing = car.transform.Find(BodyColliderName);
+
+            if (existing != null)
+            {
+                UnityEngine.Object.DestroyImmediate(existing.gameObject);
+            }
+
+            // ClassicCarRed's root is tagged MainCamera, which is a long-standing
+            // mistag noted in Docs/SETUP_CHECKLIST.md. Nothing reads it any more, but a
+            // car object claiming to be the main camera is a trap worth removing.
+            if (car.CompareTag("MainCamera"))
+            {
+                car.gameObject.tag = "Untagged";
+                EditorUtility.SetDirty(car.gameObject);
+                Debug.Log($"[VehicleDressingTool] '{car.name}' was tagged MainCamera; cleared it.", car);
+            }
+
+            var host = new GameObject(BodyColliderName);
+            host.transform.SetParent(car.transform, false);
+
+            // Tagged like the authored body boxes, so the legacy forward-parking trigger
+            // would still see it if anything ever switched that path back on.
+            host.tag = "Player";
+
+            float bottom = groundLocalY + RideHeightClearance;
+            float top = body.max.y;
+
+            if (top <= bottom)
+            {
+                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' is shorter than its own ride height; collision box skipped.", car);
+                UnityEngine.Object.DestroyImmediate(host);
+                return;
+            }
+
+            var collider = host.AddComponent<BoxCollider>();
+
+            // Inset slightly so the collision box never pokes out past the paintwork.
+            collider.center = new Vector3(body.center.x, (bottom + top) * 0.5f, body.center.z);
+            collider.size = new Vector3(body.size.x * 0.96f, top - bottom, body.size.z * 0.98f);
+
+            EditorUtility.SetDirty(host);
+
+            Debug.Log(
+                $"[VehicleDressingTool] '{car.name}': body collision box fitted from {bottom - groundLocalY:0.00}m above the road " +
+                $"up to {top - groundLocalY:0.00}m ({collider.size:0.00}). Cones are 0.33m tall.",
+                car);
+        }
+
+        // Where the tyres meet the road, in the car's own local space.
+        private static bool TryMeasureGroundLine(CarController car, out float groundLocalY)
+        {
+            groundLocalY = float.MaxValue;
+            bool any = false;
+
+            foreach (CarController.Wheel wheel in car.wheels)
+            {
+                if (wheel.wheelCollider == null)
+                {
+                    continue;
+                }
+
+                Vector3 contact = wheel.wheelCollider.transform.position
+                                  + Vector3.down * wheel.wheelCollider.radius;
+
+                groundLocalY = Mathf.Min(groundLocalY, car.transform.InverseTransformPoint(contact).y);
+                any = true;
+            }
+
+            return any;
         }
 
         // The showroom cars are copies with no CarController, so nothing had ever given
