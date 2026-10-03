@@ -159,7 +159,7 @@ namespace CarParkingGame.UI
             // are clones of those, standing at the same world positions.
             if (session != null && session.Mode == GameplayMode.Challenge)
             {
-                return missionId <= MissionManager.BaseMissionCount;
+                return MissionManager.Instance != null && missionId <= MissionManager.Instance.HighestMissionId;
             }
 
             if (catalog != null && catalog.Find(missionId) == null)

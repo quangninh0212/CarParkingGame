@@ -455,9 +455,6 @@ namespace CarParkingGame.EditorTools
             GameObject ring = CreateChild(parent, "ControlRing");
             SetRect(ring.GetComponent<RectTransform>(), new Vector2(1f, 0f), centre, new Vector2(2f, 2f), new Vector2(0.5f, 0.5f));
 
-            Image halo = CreateIcon(ring.transform, "Halo", "ring", new Color(1f, 1f, 1f, 0.13f), RingRadius * 2f + RingButtonSize * 0.1f);
-            SetRect(halo.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.one * (RingRadius * 2f), new Vector2(0.5f, 0.5f));
-
             (Button button, Image icon) left = RingButton(ring.transform, "LeftIndicatorButton", "indicator-left", 162f);
             (Button button, Image icon) headlight = RingButton(ring.transform, "HeadlightButton", "headlight", 126f);
             (Button button, Image icon) camera = RingButton(ring.transform, "CameraButton", "camera", 90f);
@@ -787,8 +784,10 @@ namespace CarParkingGame.EditorTools
             stats.color = new Color(1f, 1f, 1f, 0.8f);
             SetRect(stats.rectTransform, new Vector2(0f, 1f), new Vector2(64f, -352f), new Vector2(500f, 180f), new Vector2(0f, 1f));
 
-            Text price = CreateLabel(screen.transform, "Price", string.Empty, 32, TextAnchor.MiddleLeft);
-            SetRect(price.rectTransform, new Vector2(0f, 1f), new Vector2(64f, -560f), new Vector2(400f, 44f), new Vector2(0f, 0.5f));
+            // Wide, because this line carries "3000 coins - 1800 more needed" as well as a
+            // bare price.
+            Text price = CreateLabel(screen.transform, "Price", string.Empty, 26, TextAnchor.MiddleLeft);
+            SetRect(price.rectTransform, new Vector2(0f, 1f), new Vector2(64f, -560f), new Vector2(640f, 44f), new Vector2(0f, 0.5f));
 
             Text paintCaption = CreateLabel(screen.transform, "PaintCaption", "PAINT", 24, TextAnchor.MiddleLeft);
             paintCaption.color = new Color(1f, 1f, 1f, 0.55f);
@@ -830,6 +829,7 @@ namespace CarParkingGame.EditorTools
             SetPrivate(view, "nextButton", next);
             SetPrivate(view, "buyButton", buy);
             SetPrivate(view, "selectButton", select);
+            SetPrivate(view, "selectButtonLabel", select.transform.Find("Label").GetComponent<Text>());
             SetPrivate(view, "lockedBadge", lockedBadge.gameObject);
             SetPrivate(view, "selectedBadge", selectedBadge.gameObject);
             SetPrivateArray(view, "colorButtons", colorButtons);

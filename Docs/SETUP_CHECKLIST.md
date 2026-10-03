@@ -33,25 +33,37 @@ Three game modes, reached from **PLAY** or **GAME MODE** on the home screen:
 
 Missions 9–30 are clones of 1–8 at the same world positions, so a challenge run is only the eight distinct bays (`MissionManager.BaseMissionCount`).
 
+**Missions 9–30 are now twenty-two distinct places on the track**, not clones of 1–8 at the same world positions. `MissionSiteBuilder` samples the ground on a 5 m grid, raycasts each sample, keeps only the ones that land on a drivable surface by name (tarmac, pit lane, concrete — never grass, gravel or sand), and then tests each in eight headings with two box casts: one for the bay, one for the 20 m approach lane. That test only means anything because the scenery has colliders now. Sites are spaced at least 40 m apart and shuffled with a fixed seed, so a rebuild puts them back in the same places.
+
+Because the thirty sites are distinct, they can all stand up at once, so **a challenge run is all thirty stages**, not eight. `MissionManager.MissionCount` / `HighestMissionId` replaced the old `BaseMissionCount` constant.
+
+`MissionSiteShotTool` renders every bay from directly above onto one contact sheet. Run it after any change to the sites: the raycast proves the ground is flat, drivable and clear, and proves nothing about whether a bay landed somewhere that reads as a car park.
+
 Four bugs from the report, and what was actually wrong:
 
 - **"Can't steer once the yellow bar shows."** The track's barriers are tagged `Cone`, and the legacy `MissionFailedHandler` froze the car with `SetVehicleEnabled(false)` the moment one was touched — so clipping a barrier while lining up left the player stuck. `MissionFailedHandler` and `ParkingTrigger` now stand down wherever a `GameSession` exists, and a collision costs score instead. The hint text also now names the condition that is actually blocking the park ("Get the whole car inside the bay" / "Straighten up" / "Come to a stop") rather than the unhelpful "Line the car up inside the bay".
-- **"The barriers can be driven through."** They had no colliders at all. The track pack ships one hand-made collision group, `oval_complete_colliders`, which covers the walls, garages and ground and nothing else. `Tools → Car Parking → Make Track Scenery Solid` adds 107 `MeshCollider`s across the barriers, tyre stacks, plastic blocks, lamp posts, pit wall, bridges, start lights and buildings. Trees and grandstands are deliberately left alone: they are out of reach and a collider each is a cost an Android build should not pay.
+- **"The barriers can be driven through."** They had no colliders at all. The track pack ships one hand-made collision group, `oval_complete_colliders`, whose name suggests it covers the track and does not. `Tools → Car Parking → Make Track Scenery Solid` adds 174 `MeshCollider`s across the walls and chain-link fences (45 of them — these were missed on the first pass and are what was still being driven through), barriers, tyre stacks, plastic blocks, lamp posts, pit wall, bridges, start lights, buildings, grandstands, tents and signs. The terrain group is included too, so the car can no longer fall through `0GRASS`; only the `underground` skirt mesh is excluded. Trees are deliberately left alone: they sit behind fences, and a collider each is a cost an Android build should not pay.
 - **"No car in the garage."** The garage panel was an opaque full-screen rectangle in front of a camera pointed at nothing. The panel is now a column down the left, and `ShowroomCameraRig` frames the showroom car — which is standing in the world already — in the space beside it. Both menu framings look from the same side of the showroom; round the other side there is a lamp post within a couple of metres of the car. The paint swatches are also coloured from the palette now; they used to be eight identical white discs.
-- **"The camera views are wrong."** Cockpit and look-back now share one eye point — the driver's head, measured per car from its own body bounds by `VehicleViewPoints` — and the rear view is that same seat yawed 180°. The old version used a fixed offset near the bonnet and a boom behind the boot.
+- **"The camera views are wrong."** `VehicleViewPoints` measures both seated cameras per car from its own body bounds. Looking forward and looking back are **two separate points, not one point turned round**: spun on the spot from the driver's seat, the back of the cabin fills the whole view, which is why the rear view came out black. The driver's eye sits seven tenths of the way up the body and three tenths of the half-length ahead of its middle; the look-back point sits at the roof line, behind the middle, pitched 14° down. Both were settled by rendering them — see `VehicleViewShotTool`, which takes `-eyeHeight`, `-eyeLength`, `-rearHeight`, `-rearLength` and the two pitches so the seat can be swept over several values and the results compared.
+
+  **The numbers are written into the cars by `Dress Cars With Lights And Horn`, not left to the component's defaults.** A component already serialized into the scene keeps its stored values when a field's default changes, so changing the default alone does nothing. The same trap applies to `ShowroomCameraRig`, whose framing `Build Game UI` writes explicitly.
 
 Headlamps are placed from each car's **body bounds** rather than its wheel positions, so the pair sits symmetrically on the real nose and tail at bumper height; the spot lights are dipped 10°. Re-run with `Tools → Car Parking → Dress Cars With Lights And Horn`.
 
 The HUD's car controls are five circular icon buttons on an arc over the brake pedal, with the indicators on the side they signal; the headlight and indicator icons light amber while active. Icons are generated as PNGs by `Tools → Car Parking → Generate UI Icons` (`Assets/GameAssets/Sprites/Icons`) — replace them with drawn art whenever it exists, the file names are the contract.
 
-**Rebuilding:** run the tools in this order, each of which opens and saves the gameplay scene:
-`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Game UI` → `Check Game UI`.
-`Build Game UI` is safe to re-run: it lifts SimpleInput's steering wheel, pedals and brake out of the canvas before deleting it and puts them back afterwards.
+**Rebuilding:** run the tools in this order, each of which opens and saves the gameplay scene. The order matters — the site builder's box casts are meaningless until the scenery is solid:
+
+`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Distinct Mission Sites 9-30` → `Build Game UI` → `Check Game UI`
+
+`Build Game UI` is safe to re-run: it lifts SimpleInput's steering wheel, pedals and brake out of the canvas before deleting it and puts them back afterwards. `Build Distinct Mission Sites 9-30` takes detached copies of the props it clones before deleting the old containers, for the same reason.
+
+**Garage.** Only the Classic is free; the Hot Rod is 3000 coins and the Muscle 6000, against roughly 300 a mission. Every state now says what it is — `OWNED`, `YOU ARE DRIVING THIS`, or `3000 coins - 1800 more needed` — because a bare price next to a dead button looked identical to a broken screen. The paint swatches are coloured from the palette, and the showroom cars carry a `CarPaintTarget` now: they are copies with no `CarController`, so the dressing tool had never given them one and picking a colour changed nothing on screen.
 
 **Still needs an Editor eyeball** (it cannot be checked from the command line):
-- The driver's-seat camera on each of the three cars — the eye point is measured, but whether it clears the roof line and the dashboard is a judgement call.
 - The headlamp spheres on each car. They are plain objects under `PlaceholderLights`; drag them if they sit proud of the bodywork.
-- Whether 120s per challenge stage is the right difficulty (`GameSession` → Challenge mode → Challenge Seconds Per Stage).
+- Whether 120s per challenge stage is enough now that a run is thirty stages and the car drives between them (`GameSession` → Challenge mode → Challenge Seconds Per Stage).
+- Several of the new bays sit on the live racing line. That is what the map has — it is a circuit, not a car park — but move any that read badly; each one is a `MissionNN_Site` root you can drag.
 
 ### Missions
 

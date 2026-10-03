@@ -76,7 +76,7 @@ namespace CarParkingGame.UI
             return active.Mode switch
             {
                 GameplayMode.Practice => "PRACTICE",
-                GameplayMode.Challenge => $"CHALLENGE  STAGE {active.ChallengeStage}/{MissionManager.BaseMissionCount}",
+                GameplayMode.Challenge => $"CHALLENGE  STAGE {active.ChallengeStage}/{MissionManager.Instance?.MissionCount}",
                 GameplayMode.FreeRoam => "FREE DRIVE",
                 _ => string.Empty
             };

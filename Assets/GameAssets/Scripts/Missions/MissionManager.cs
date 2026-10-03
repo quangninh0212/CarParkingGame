@@ -17,8 +17,6 @@ namespace CarParkingGame.Missions
     // MissionLaunchOptions, so practice and challenge share this one runner.
     public class MissionManager : MonoBehaviour
     {
-        public const int BaseMissionCount = 8;
-
         public static MissionManager Instance { get; private set; }
 
         [SerializeField] private ScoreRules defaultScoreRules;
@@ -206,17 +204,15 @@ namespace CarParkingGame.Missions
             }
         }
 
-        // Only the originals: missions 9-30 are clones sitting at the same world positions
-        // as 1-8, so they can never be shown at the same time as their source. Challenge
-        // mode dresses the whole map, which means exactly these eight.
-        public void SetBaseEnvironmentsActive(bool active)
-        {
-            for (int i = 0; i < registeredMissions.Count; i++)
-            {
-                MissionAuthoring mission = registeredMissions[i];
-                mission.SetEnvironmentActive(active && mission.MissionId <= BaseMissionCount);
-            }
-        }
+        // How many stages a challenge run has: every mission with a layout in the scene.
+        // This used to be a constant eight, because missions 9-30 were clones standing at
+        // the same world positions as 1-8 and could not be shown together. They are
+        // distinct places now, so the whole ladder can stand up at once.
+        public int MissionCount => registeredMissions.Count;
+
+        public int HighestMissionId => registeredMissions.Count == 0
+            ? 0
+            : registeredMissions[registeredMissions.Count - 1].MissionId;
 
         public bool StartMission(int missionId)
         {

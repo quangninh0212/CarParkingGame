@@ -166,7 +166,7 @@ namespace CarParkingGame.Core
             EnterPlay(GameplayMode.Challenge);
             challengeStage = 0;
 
-            runner.SetBaseEnvironmentsActive(true);
+            runner.SetAllEnvironmentsActive(true);
             StartChallengeStage(1);
         }
 
@@ -202,9 +202,10 @@ namespace CarParkingGame.Core
                 return false;
             }
 
+            MissionManager runner = Missions;
             int next = challengeStage + 1;
 
-            if (next > MissionManager.BaseMissionCount)
+            if (runner == null || next > runner.HighestMissionId)
             {
                 return false;
             }

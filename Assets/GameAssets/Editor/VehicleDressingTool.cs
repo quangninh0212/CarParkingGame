@@ -89,6 +89,7 @@ namespace CarParkingGame.EditorTools
                 DressCar(car, horn, headlightMaterial, brakeMaterial, indicatorMaterial);
             }
 
+            DressShowroomCars();
             WireCameraDirector();
         }
 
@@ -210,11 +211,16 @@ namespace CarParkingGame.EditorTools
         // this list by hand in the Inspector if it looks wrong.
         private static void WirePaintTarget(CarController car, Transform lampRoot)
         {
+            WirePaintTargetOn(car.transform, lampRoot);
+        }
+
+        private static void WirePaintTargetOn(Transform car, Transform lampRoot)
+        {
             var bodyRenderers = new List<Renderer>();
 
             foreach (Renderer renderer in car.GetComponentsInChildren<Renderer>(true))
             {
-                if (renderer.transform.IsChildOf(lampRoot))
+                if (lampRoot != null && renderer.transform.IsChildOf(lampRoot))
                 {
                     continue;
                 }
@@ -234,6 +240,7 @@ namespace CarParkingGame.EditorTools
             }
 
             CarPaintTarget paint = car.GetComponent<CarPaintTarget>();
+
 
             if (paint == null)
             {
@@ -261,8 +268,12 @@ namespace CarParkingGame.EditorTools
             Debug.Log($"[VehicleDressingTool] '{car.name}': {bodyRenderers.Count} paintable renderer(s) assigned.", car);
         }
 
-        // Where the driver sits, measured now so the cockpit and look-back cameras do not
-        // have to work it out on the first frame of play.
+        // Where the driver sits and where the look-back camera sits, measured now so the
+        // cameras do not have to work it out on the first frame of play.
+        //
+        // The fractions are written explicitly rather than left to the component's own
+        // defaults: a component already serialized into the scene keeps its stored values
+        // when the field's default changes, so re-running this would otherwise do nothing.
         private static void MeasureViewPoints(CarController car)
         {
             var points = car.GetComponent<CarParkingGame.Vehicle.VehicleViewPoints>();
@@ -272,10 +283,37 @@ namespace CarParkingGame.EditorTools
                 points = car.gameObject.AddComponent<CarParkingGame.Vehicle.VehicleViewPoints>();
             }
 
+            // Checked by rendering what each car's driver actually sees; see
+            // VehicleViewShotTool. Lower than this and the view is the dashboard.
+            points.EditorSetFractions(-0.42f, 0.3f, 0.7f, -0.45f, 1f);
             points.Measure();
             EditorUtility.SetDirty(points);
 
-            Debug.Log($"[VehicleDressingTool] '{car.name}': driver's eye at {points.DriverEyeLocalPosition:0.00} in car space.", car);
+            Debug.Log($"[VehicleDressingTool] '{car.name}': driver's eye at {points.DriverEyeLocalPosition:0.00}, look-back at {points.RearViewLocalPosition:0.00}.", car);
+        }
+
+        // The showroom cars are copies with no CarController, so nothing had ever given
+        // them a paint target - which is why picking a colour in the garage changed
+        // nothing on screen.
+        private static void DressShowroomCars()
+        {
+            var garage = UnityEngine.Object.FindFirstObjectByType<GarageManager>(FindObjectsInactive.Include);
+
+            if (garage == null || garage.ShowroomCarContainer == null)
+            {
+                Debug.LogWarning("[VehicleDressingTool] No showroom car container found; the garage's colour swatches will not show on the showroom car.");
+                return;
+            }
+
+            Transform container = garage.ShowroomCarContainer.transform;
+
+            for (int i = 0; i < container.childCount; i++)
+            {
+                Transform car = container.GetChild(i);
+                WirePaintTargetOn(car, null);
+            }
+
+            Debug.Log($"[VehicleDressingTool] {container.childCount} showroom car(s) can now be painted.", container);
         }
 
         private struct CarMeasurements

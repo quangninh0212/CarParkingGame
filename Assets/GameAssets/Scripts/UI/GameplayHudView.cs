@@ -28,6 +28,8 @@ namespace CarParkingGame.UI
 
         private ParkingState lastState = ParkingState.Outside;
 
+        private int StageCount => Missions != null ? Missions.MissionCount : 0;
+
         private MissionManager Missions => missionManager != null ? missionManager : MissionManager.Instance;
 
         private void OnEnable()
@@ -118,7 +120,7 @@ namespace CarParkingGame.UI
             if (missionNameLabel != null)
             {
                 string prefix = GameSession.Instance != null && GameSession.Instance.Mode == GameplayMode.Challenge
-                    ? $"STAGE {GameSession.Instance.ChallengeStage}/{MissionManager.BaseMissionCount}  "
+                    ? $"STAGE {GameSession.Instance.ChallengeStage}/{StageCount}  "
                     : $"{definition.MissionId:00}  ";
 
                 missionNameLabel.text = prefix + definition.DisplayName;

@@ -25,8 +25,14 @@ namespace CarParkingGame.EditorTools
         private const string ScenePath = "Assets/GameAssets/CartoonTracksPack1/Track1/Demo Scenes/complete_track_demo.unity";
 
         // Container names, matched exactly, under which every mesh becomes solid.
+        //
+        // oval_mod_walls is the big one and was missed the first time: 45 meshes of wall
+        // and chain-link fence running the length of the track. "oval_complete_colliders"
+        // looked like it covered them and does not, which is why the fences could still be
+        // driven through after the first pass.
         private static readonly string[] SolidGroups =
         {
+            "oval_mod_walls",
             "oval_mod_barriers",
             "oval_mod_tyres",
             "oval_mod_blocks",
@@ -34,7 +40,18 @@ namespace CarParkingGame.EditorTools
             "oval_mod_pitwall",
             "oval_mod_bridges",
             "oval_mod_startlights",
-            "oval_mod_buildings"
+            "oval_mod_buildings",
+            "oval_mod_seats",
+            "oval_mod_tents",
+            "oval_mod_turnsigns",
+            "oval_mod_terrain"
+        };
+
+        // Under the terrain group only: a skirt mesh below the whole track, which would
+        // become a second floor under everything if it were made solid.
+        private static readonly HashSet<string> NeverSolid = new HashSet<string>
+        {
+            "underground"
         };
 
         [MenuItem("Tools/Car Parking/Make Track Scenery Solid")]
@@ -85,7 +102,7 @@ namespace CarParkingGame.EditorTools
 
                 foreach (MeshFilter filter in group.GetComponentsInChildren<MeshFilter>(true))
                 {
-                    if (filter.sharedMesh == null)
+                    if (filter.sharedMesh == null || NeverSolid.Contains(filter.name))
                     {
                         continue;
                     }

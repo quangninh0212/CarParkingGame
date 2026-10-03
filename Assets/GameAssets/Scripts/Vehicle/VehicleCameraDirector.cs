@@ -25,11 +25,11 @@ namespace CarParkingGame.Vehicle
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private CarCameraController legacyFollowCamera;
 
-        [Tooltip("Looking back over your shoulder is a slightly higher, further back seat position.")]
-        [SerializeField] private Vector3 rearViewNudge = new Vector3(0f, 0.06f, -0.15f);
-
-        [Tooltip("Both seated views look slightly down, the way a driver does.")]
+        [Tooltip("The driver's view looks slightly down, the way a driver does.")]
         [SerializeField] private float seatedPitchDegrees = 4f;
+
+        [Tooltip("Looking back is aimed further down: what matters behind you is the ground.")]
+        [SerializeField] private float rearPitchDegrees = 14f;
 
         [Tooltip("Near clip while seated, so the car's own bodywork does not fill the view.")]
         [SerializeField] private float seatedNearClip = 0.05f;
@@ -38,7 +38,8 @@ namespace CarParkingGame.Vehicle
         private Camera cameraComponent;
         private float authoredNearClip = 0.3f;
         private CarController measuredCar;
-        private Vector3 eyeLocalPosition = new Vector3(-0.35f, 1.1f, 0.1f);
+        private Vector3 eyeLocalPosition = new Vector3(-0.35f, 1.1f, 0.6f);
+        private Vector3 rearLocalPosition = new Vector3(0f, 1.2f, -0.6f);
 
         public VehicleCameraMode Mode => mode;
 
@@ -129,26 +130,27 @@ namespace CarParkingGame.Vehicle
             }
 
             Transform body = car.transform;
-            Vector3 eye = ResolveEyeLocalPosition(car);
+            bool rear = mode == VehicleCameraMode.Rear;
 
-            if (mode == VehicleCameraMode.Rear)
-            {
-                eye += rearViewNudge;
-            }
+            Measure(car);
 
             // Yawed 180 degrees for the rear view rather than aimed with LookRotation:
             // turning in place is what a driver does, and it keeps roll tied to the car.
-            Quaternion facing = body.rotation
-                                * Quaternion.Euler(seatedPitchDegrees, mode == VehicleCameraMode.Rear ? 180f : 0f, 0f);
+            Quaternion facing = body.rotation * Quaternion.Euler(
+                rear ? rearPitchDegrees : seatedPitchDegrees,
+                rear ? 180f : 0f,
+                0f);
 
-            cameraTransform.SetPositionAndRotation(body.TransformPoint(eye), facing);
+            cameraTransform.SetPositionAndRotation(
+                body.TransformPoint(rear ? rearLocalPosition : eyeLocalPosition),
+                facing);
         }
 
-        private Vector3 ResolveEyeLocalPosition(CarController car)
+        private void Measure(CarController car)
         {
             if (measuredCar == car)
             {
-                return eyeLocalPosition;
+                return;
             }
 
             measuredCar = car;
@@ -162,7 +164,7 @@ namespace CarParkingGame.Vehicle
             }
 
             eyeLocalPosition = points.DriverEyeLocalPosition;
-            return eyeLocalPosition;
+            rearLocalPosition = points.RearViewLocalPosition;
         }
     }
 }

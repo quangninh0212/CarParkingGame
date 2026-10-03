@@ -27,6 +27,7 @@ namespace CarParkingGame.UI
         [SerializeField] private Button nextButton;
         [SerializeField] private Button buyButton;
         [SerializeField] private Button selectButton;
+        [SerializeField] private Text selectButtonLabel;
         [SerializeField] private GameObject lockedBadge;
         [SerializeField] private GameObject selectedBadge;
         [SerializeField] private Button[] colorButtons;
@@ -110,9 +111,28 @@ namespace CarParkingGame.UI
                 coinLabel.text = SaveManager.Data.coins.ToString();
             }
 
+            // The garage used to show a bare number and a dead button, so "I can't press
+            // anything" and "this costs more than I have" looked identical. Every state now
+            // says what it is.
             if (priceLabel != null)
             {
-                priceLabel.text = owned ? string.Empty : car.PurchasePrice.ToString();
+                if (owned)
+                {
+                    priceLabel.text = selected ? "YOU ARE DRIVING THIS" : "OWNED";
+                }
+                else
+                {
+                    int shortfall = car.PurchasePrice - SaveManager.Data.coins;
+
+                    priceLabel.text = shortfall > 0
+                        ? $"{car.PurchasePrice} coins - {shortfall} more needed"
+                        : $"{car.PurchasePrice} coins";
+                }
+            }
+
+            if (selectButtonLabel != null)
+            {
+                selectButtonLabel.text = selected ? "DRIVING" : "DRIVE";
             }
 
             if (statsLabel != null)
