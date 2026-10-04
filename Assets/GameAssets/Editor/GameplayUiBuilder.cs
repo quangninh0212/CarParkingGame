@@ -366,17 +366,25 @@ namespace CarParkingGame.EditorTools
             group.SetActive(false);
         }
 
-        // One mirror: a dark bezel with the glass inset into it.
+        // One mirror: a light bezel with the glass inset into it.
+        //
+        // The bezel was nearly black, which was invisible: the seated view looks out of an
+        // unlit cabin, so the mirrors hung against black and had no edge at all. A pale
+        // housing reads against the cabin and still reads against a bright sky, which is
+        // the other thing behind them.
         private static RawImage MirrorGlass(Transform parent, string name, Vector2 anchor,
             Vector2 position, Vector2 size)
         {
-            GameObject bezel = CreatePanel(parent, name, anchor, position, size, new Color(0.07f, 0.07f, 0.08f, 0.95f));
+            GameObject bezel = CreatePanel(parent, name, anchor, position, size, new Color(0.78f, 0.80f, 0.84f, 1f));
 
             GameObject surface = CreateChild(bezel.transform, "Glass");
             var glass = surface.AddComponent<RawImage>();
 
+            // A twelve pixel housing each side rather than eight. The whole reason this
+            // is a pale colour is to be seen against an unlit cabin, and a hairline is not
+            // seen whatever colour it is.
             SetRect(glass.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero,
-                size - new Vector2(16f, 16f), new Vector2(0.5f, 0.5f));
+                size - new Vector2(24f, 24f), new Vector2(0.5f, 0.5f));
 
             // Nothing to press. Left on, a mirror would eat taps meant for the HUD under it.
             glass.raycastTarget = false;
