@@ -182,6 +182,56 @@ namespace CarParkingGame.EditorTools
             }
         }
 
+        // A bay as the player sees it: a closed rectangle with an arrow inside it pointing
+        // the way the car's nose has to end up, drawn around the parent's own origin and
+        // along its +Z.
+        //
+        // Three sides and no arrow was not playable - from inside the car there is no way
+        // to tell whether a bay wants you nose in or tail in, and guessing wrong fails the
+        // heading check with nothing on screen to say why.
+        public void PaintBay(Transform bay, float width, float length)
+        {
+            // Road paint, so: wide and all but flat. A narrow strip standing 10cm proud is
+            // a kerb seen edge on from a driver's eye - all shadowed side, almost no top
+            // face - and it reads as a dark line rather than as paint.
+            const float Paint = 0.32f;
+            const float Thickness = 0.03f;
+            const float Lift = 0.035f;
+            const float Stroke = 0.55f;
+
+            float halfWidth = width * 0.5f;
+            float halfLength = length * 0.5f;
+
+            PaintStroke(bay, new Vector3(-halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
+            PaintStroke(bay, new Vector3(halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
+            PaintStroke(bay, new Vector3(0f, Lift, halfLength), 0f, new Vector3(width, Thickness, Paint));
+            PaintStroke(bay, new Vector3(0f, Lift, -halfLength), 0f, new Vector3(width, Thickness, Paint));
+
+            float shaft = length * 0.5f;
+            float head = width * 0.42f;
+
+            PaintStroke(bay, new Vector3(0f, Lift, -length * 0.08f), 0f, new Vector3(Stroke, Thickness, shaft));
+
+            var tip = new Vector3(0f, Lift, shaft * 0.5f - length * 0.08f);
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                const float Spread = 38f * Mathf.Deg2Rad;
+                var direction = new Vector2(side * Mathf.Sin(Spread), -Mathf.Cos(Spread));
+
+                Vector3 centre = tip + new Vector3(direction.x, 0f, direction.y) * (head * 0.5f);
+                float yaw = Mathf.Atan2(direction.x, direction.y) * Mathf.Rad2Deg;
+
+                PaintStroke(bay, centre, yaw, new Vector3(Stroke, Thickness, head));
+            }
+        }
+
+        private void PaintStroke(Transform bay, Vector3 position, float yaw, Vector3 size)
+        {
+            GameObject stroke = Spawn(Part.Plate, bay, position, yaw, size);
+            Tint(stroke, "CourseBayPaint", new Color(1f, 0.82f, 0.15f), true);
+        }
+
         public void Kerb(Transform parent, Vector2 from, Vector2 to, float width = 0.5f)
         {
             Wall(parent, from, to, 0.18f, width, Part.Kerb);

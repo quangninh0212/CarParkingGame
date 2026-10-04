@@ -375,6 +375,24 @@ namespace CarParkingGame.EditorTools
             // Lighter than the courses that stand on it, so each course reads as its own
             // plot rather than dissolving into the site.
             MissionCourseKit.Tint(slab, "CourseApron", new Color(0.36f, 0.36f, 0.38f));
+
+            // A wall round the whole site. The slab stands clear of the terrain, so
+            // without this, running wide anywhere on it drops the car off the world.
+            float halfWidth = used.size.x * 0.5f + ApronMargin;
+            float halfLength = used.size.z * 0.5f + ApronMargin;
+
+            var corners = new[]
+            {
+                new Vector2(-halfWidth, -halfLength),
+                new Vector2(halfWidth, -halfLength),
+                new Vector2(halfWidth, halfLength),
+                new Vector2(-halfWidth, halfLength)
+            };
+
+            for (int i = 0; i < corners.Length; i++)
+            {
+                kit.Wall(apron.transform, corners[i], corners[(i + 1) % corners.Length], 2.5f, 0.8f);
+            }
         }
 
         // The course owns its own mission data. The catalog's old entries were written for
@@ -511,9 +529,24 @@ namespace CarParkingGame.EditorTools
 
             var writer = new CourseWriter(root.transform, kit, course);
             writer.Level(0f);
-            writer.Pad(drop);
+
+            // Courses with more than one deck lay their own floors: a single slab over the
+            // whole footprint would be a ceiling over the lower level, and the ramp down
+            // from it would run straight into the underside of the course.
+            if (course.singleDeck)
+            {
+                writer.Pad(drop);
+            }
 
             course.layout(writer);
+
+            // After the layout, so the entrance gap can be put where the course's own
+            // start point is rather than guessed at.
+            if (course.singleDeck)
+            {
+                float entranceX = writer.StartPoint != null ? writer.StartPoint.localPosition.x : 0f;
+                writer.Rail(0f, course.length * 0.5f, course.width, course.length, 12f, entranceX);
+            }
 
             if (writer.Zone == null)
             {
@@ -582,6 +615,39 @@ namespace CarParkingGame.EditorTools
             // colliders from markings, because a painted line the car bumps into is worse
             // than no line. Spawned as a marking the pad had no collider at all and the
             // car dropped straight through the floor of the course.
+            // A wall round the edge of a deck, so the player cannot drive off it.
+            //
+            // Every course stands on a raised slab; before this, running wide at the edge
+            // dropped the car off the world. The entrance gap is only left on the deck the
+            // course starts on.
+            public void Rail(float x, float z, float width, float length, float entranceGap = 0f, float entranceCentreX = 0f)
+            {
+                const float Height = 1.6f;
+
+                float left = x - width * 0.5f;
+                float right = x + width * 0.5f;
+                float near = z - length * 0.5f;
+                float far = z + length * 0.5f;
+
+                kit.Wall(root, new Vector2(left, near), new Vector2(left, far), Height, 0.5f);
+                kit.Wall(root, new Vector2(right, near), new Vector2(right, far), Height, 0.5f);
+                kit.Wall(root, new Vector2(left, far), new Vector2(right, far), Height, 0.5f);
+
+                if (entranceGap <= 0f)
+                {
+                    kit.Wall(root, new Vector2(left, near), new Vector2(right, near), Height, 0.5f);
+                    return;
+                }
+
+                // The gap goes where the course's entrance actually is. Centring it blindly
+                // walled the start point in on every course that begins off to one side.
+                float gapLeft = Mathf.Clamp(entranceCentreX - entranceGap * 0.5f, left, right);
+                float gapRight = Mathf.Clamp(entranceCentreX + entranceGap * 0.5f, left, right);
+
+                kit.Wall(root, new Vector2(left, near), new Vector2(gapLeft, near), Height, 0.5f);
+                kit.Wall(root, new Vector2(gapRight, near), new Vector2(right, near), Height, 0.5f);
+            }
+
             public void PadAt(float x, float z, float width, float length, float thickness = 0.5f)
             {
                 GameObject pad = kit.Spawn(MissionCourseKit.Part.Concrete, root,
@@ -682,61 +748,6 @@ namespace CarParkingGame.EditorTools
                 StartPoint = startPoint.transform;
             }
 
-            // The bay as the player sees it: a closed rectangle with an arrow inside it
-            // pointing the way the car's nose has to end up.
-            //
-            // Three sides and no arrow was not enough to play with - there is no way to
-            // tell from inside the car whether a bay wants you nose in or tail in, and
-            // guessing wrong fails the heading check with nothing on screen to say why.
-            private void PaintBay(Transform bay, float width, float length)
-            {
-                // Road paint, so: wide and all but flat. Earlier it was a 22cm strip standing
-                // 10cm proud, which from a driver's eye is a kerb seen edge on - all
-                // shadowed side and almost no top face, and it read as a dark line.
-                const float Paint = 0.32f;
-                const float Thickness = 0.03f;
-                const float Lift = 0.035f;
-
-                float halfWidth = width * 0.5f;
-                float halfLength = length * 0.5f;
-
-                PaintStroke(bay, new Vector3(-halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
-
-                PaintStroke(bay, new Vector3(halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
-                PaintStroke(bay, new Vector3(0f, Lift, halfLength), 0f, new Vector3(width, Thickness, Paint));
-                PaintStroke(bay, new Vector3(0f, Lift, -halfLength), 0f, new Vector3(width, Thickness, Paint));
-
-                // The arrow runs up the middle towards the bay's own forward axis, which
-                // is the heading the parking validator measures against.
-                float shaft = length * 0.5f;
-                float head = width * 0.42f;
-                const float Stroke = 0.55f;
-
-                PaintStroke(bay, new Vector3(0f, Lift, -length * 0.08f), 0f, new Vector3(Stroke, Thickness, shaft));
-
-                var tip = new Vector3(0f, Lift, shaft * 0.5f - length * 0.08f);
-
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    const float Spread = 38f * Mathf.Deg2Rad;
-                    var direction = new Vector2(side * Mathf.Sin(Spread), -Mathf.Cos(Spread));
-
-                    Vector3 centre = tip + new Vector3(direction.x, 0f, direction.y) * (head * 0.5f);
-                    float yaw = Mathf.Atan2(direction.x, direction.y) * Mathf.Rad2Deg;
-
-                    PaintStroke(bay, centre, yaw, new Vector3(Stroke, Thickness, head));
-                }
-            }
-
-            // One stroke of bay paint. Cast from the plain block and coloured flat, because
-            // the striped marking prefab is a short bar: stretched to the length of a bay
-            // its stripes smear out and the line disappears.
-            private void PaintStroke(Transform bay, Vector3 position, float yaw, Vector3 size)
-            {
-                GameObject stroke = kit.Spawn(MissionCourseKit.Part.Plate, bay, position, yaw, size);
-                MissionCourseKit.Tint(stroke, "CourseBayPaint", new Color(1f, 0.82f, 0.15f), true);
-            }
-
             public Transform DefaultStart()
             {
                 Start(0f, 3f);
@@ -756,7 +767,7 @@ namespace CarParkingGame.EditorTools
                 zone.EditorSetBox(Vector3.zero, new Vector3(width, 2.5f, length));
                 zone.EditorSetParkedFacingBackward(false);
 
-                PaintBay(bayObject.transform, width, length);
+                kit.PaintBay(bayObject.transform, width, length);
 
                 Zone = zone;
             }

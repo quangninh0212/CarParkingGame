@@ -34,6 +34,10 @@ namespace CarParkingGame.EditorTools
             public int difficulty;
             public float width;
             public float length;
+
+            // False for the courses that build more than one deck; they lay their own
+            // floors and rails.
+            public bool singleDeck = true;
             public Action<Writer> layout;
         }
 
@@ -224,6 +228,7 @@ namespace CarParkingGame.EditorTools
             {
                 missionId = 25,
                 name = "Down The Ramp",
+                singleDeck = false,
                 description = "Follow the ramp to the lower deck and park there.",
                 parkingType = ParkingType.Forward,
                 difficulty = 4,
@@ -235,6 +240,7 @@ namespace CarParkingGame.EditorTools
             {
                 missionId = 26,
                 name = "Upper Deck",
+                singleDeck = false,
                 description = "Up one level, then into a bay among the parked cars.",
                 parkingType = ParkingType.Forward,
                 difficulty = 4,
@@ -246,6 +252,7 @@ namespace CarParkingGame.EditorTools
             {
                 missionId = 27,
                 name = "Rooftop",
+                singleDeck = false,
                 description = "Climb to the roof deck and reverse in against the parapet.",
                 parkingType = ParkingType.Reverse,
                 difficulty = 5,
@@ -279,6 +286,7 @@ namespace CarParkingGame.EditorTools
             {
                 missionId = 30,
                 name = "Final Examination",
+                singleDeck = false,
                 description = "Ramp, pillars, parked cars, and a parallel space with nothing to spare.",
                 parkingType = ParkingType.Parallel,
                 difficulty = 5,
@@ -321,14 +329,18 @@ namespace CarParkingGame.EditorTools
         }
 
         // A wall round the outside with a gap at the entrance, for the enclosed courses.
-        private static void Perimeter(Writer c, float inset, float height, float gapHalfWidth)
+        private static void Perimeter(Writer c, float inset, float height, float gapHalfWidth, float gapCentreX = 0f)
         {
             float x = c.Width * 0.5f - inset;
             float front = inset;
             float back = c.Length - inset;
 
-            c.Wall(-x, front, -gapHalfWidth, front, height);
-            c.Wall(gapHalfWidth, front, x, front, height);
+            // The gap goes where the course is entered from, which is not always the middle.
+            float gapLeft = Mathf.Clamp(gapCentreX - gapHalfWidth, -x, x);
+            float gapRight = Mathf.Clamp(gapCentreX + gapHalfWidth, -x, x);
+
+            c.Wall(-x, front, gapLeft, front, height);
+            c.Wall(gapRight, front, x, front, height);
             c.Wall(-x, back, x, back, height);
             c.Wall(-x, front, -x, back, height);
             c.Wall(x, front, x, back, height);
@@ -689,7 +701,7 @@ namespace CarParkingGame.EditorTools
         {
             c.Start(-16f, 4f);
 
-            Perimeter(c, 1.5f, 2.6f, 5f);
+            Perimeter(c, 1.5f, 2.6f, 5f, -16f);
 
             // Pillar grid, generously spaced.
             for (int row = 0; row < 3; row++)
@@ -710,7 +722,7 @@ namespace CarParkingGame.EditorTools
         {
             c.Start(-14f, 4f);
 
-            Perimeter(c, 1.5f, 2.8f, 4.5f);
+            Perimeter(c, 1.5f, 2.8f, 4.5f, -14f);
 
             for (int row = 0; row < 4; row++)
             {
@@ -720,100 +732,115 @@ namespace CarParkingGame.EditorTools
             c.CarRow(-16f, 16f, 0f, 4, 3.1f);
             c.CarRow(4f, 16f, 0f, 4, 3.1f);
             c.CarRow(-16f, 34f, 0f, 3, 3.1f);
-            c.Car(6f, 38f, 180f, Car.Muscle);
-            c.Car(12.5f, 38f, 180f, Car.Sedan);
+            c.Car(6f, 35.5f, 180f, Car.Muscle);
+            c.Car(12.5f, 35.5f, 180f, Car.Sedan);
 
-            // Against the back wall, between two cars.
-            c.Bay(9.3f, 38f, 180f, 2.9f, 6.3f);
+            // Between two cars, clear of the back wall: at z=38 the bay ran into it.
+            c.Bay(9.3f, 35.5f, 180f, 2.9f, 6.3f);
         }
 
+        // Two decks: an entrance apron, a ramp down, and the lower level. Each lays its
+        // own floor, because one slab over the whole course would roof the lower deck in.
         private static void DownTheRamp(Writer c)
         {
+            // The entrance is raised and the lower deck sits on the site, rather than the
+            // deck being sunk: the whole training site stands on seven metres of slab, so
+            // anything dug below its surface is inside solid concrete.
+            const float Entrance = 2.6f;
+
+            c.Level(Entrance);
             c.Start(0f, 4f);
 
-            c.Wall(-8f, 2f, -8f, 14f, 2.4f);
-            c.Wall(8f, 2f, 8f, 14f, 2.4f);
+            // Thick enough to reach the site surface it stands on.
+            c.PadAt(0f, 7f, 20f, 16f, Entrance + 0.5f);
+            c.Rail(0f, 7f, 20f, 16f, 11f);
             c.Arrow(0f, 8f, 0f);
 
-            // Down to the lower deck.
-            c.Ramp(0f, 14f, 0f, 30f, 8f, -2.6f);
-            c.Wall(-4.6f, 14f, -4.6f, 30f, 2.2f);
-            c.Wall(4.6f, 14f, 4.6f, 30f, 2.2f);
+            // Down to the lower deck. 16m of ramp for 2.6m of drop is about nine degrees:
+            // a WheelCollider climbs that cleanly and catches on much more.
+            c.Ramp(0f, 15f, 0f, 31f, 9f, -Entrance);
 
-            c.Level(-2.6f);
-            c.PadAt(0f, 44f, 34f, 28f);
+            c.Level(0f);
+            c.PadAt(0f, 45f, 34f, 28f);
 
-            c.Wall(-16f, 30f, -16f, 56f, 2.8f);
-            c.Wall(16f, 30f, 16f, 56f, 2.8f);
-            c.Wall(-16f, 56f, 16f, 56f, 2.8f);
+            // Railed on three sides; the fourth is where the ramp arrives.
+            c.Wall(-17f, 31f, -17f, 59f, 2.8f);
+            c.Wall(17f, 31f, 17f, 59f, 2.8f);
+            c.Wall(-17f, 59f, 17f, 59f, 2.8f);
+            c.Wall(-17f, 31f, -5.1f, 31f, 2.8f);
+            c.Wall(5.1f, 31f, 17f, 31f, 2.8f);
 
             c.Pillars(-10f, 38f, 10f, 38f, 3, 2.8f);
-            c.Pillars(-10f, 50f, 10f, 50f, 3, 2.8f);
+            c.Pillars(-10f, 52f, 10f, 52f, 3, 2.8f);
 
-            c.CarRow(-13f, 46f, 0f, 3, 3.2f);
-            c.Prop(Part.Cone, 6f, 34f, 0f, 0.75f);
+            c.CarRow(-14f, 47f, 0f, 3, 3.2f);
+            c.Prop(Part.Cone, 6f, 35f, 0f, 0.75f);
 
-            c.Bay(8f, 50f, 0f, 3.3f, 6.5f);
+            c.Bay(7f, 46f, 0f, 3.3f, 6.5f);
         }
 
         private static void UpperDeck(Writer c)
         {
             c.Start(0f, 4f);
 
+            c.PadAt(0f, 8f, 22f, 18f);
+            c.Rail(0f, 8f, 22f, 18f, 11f);
             c.Arrow(0f, 8f, 0f);
-            c.Wall(-9f, 2f, -9f, 16f, 2.4f);
-            c.Wall(9f, 2f, 9f, 16f, 2.4f);
 
-            // Up one level.
-            c.Ramp(0f, 16f, 0f, 36f, 8f, 3.4f);
-            c.Wall(-4.6f, 16f, -4.6f, 36f, 2.4f);
-            c.Wall(4.6f, 16f, 4.6f, 36f, 2.4f);
+            // Up one level: 20m of ramp for 3.4m, just under ten degrees.
+            c.Ramp(0f, 17f, 0f, 37f, 9f, 3.4f);
+            c.Wall(-5.1f, 17f, -5.1f, 37f, 1.6f, 0.5f);
+            c.Wall(5.1f, 17f, 5.1f, 37f, 1.6f, 0.5f);
 
             c.Level(3.4f);
-            c.PadAt(0f, 50f, 38f, 28f);
+            c.PadAt(0f, 51f, 38f, 28f);
 
-            // Parapet round the upper deck.
-            c.Wall(-18f, 36f, -18f, 62f, 1.2f);
-            c.Wall(18f, 36f, 18f, 62f, 1.2f);
-            c.Wall(-18f, 62f, 18f, 62f, 1.2f);
+            // Parapet round the upper deck, open where the ramp arrives.
+            c.Wall(-19f, 37f, -19f, 65f, 1.3f);
+            c.Wall(19f, 37f, 19f, 65f, 1.3f);
+            c.Wall(-19f, 65f, 19f, 65f, 1.3f);
+            c.Wall(-19f, 37f, -5.1f, 37f, 1.3f);
+            c.Wall(5.1f, 37f, 19f, 37f, 1.3f);
 
             c.Pillars(-12f, 44f, 12f, 44f, 4, 2.8f);
-            c.Pillars(-12f, 56f, 12f, 56f, 4, 2.8f);
+            c.Pillars(-12f, 58f, 12f, 58f, 4, 2.8f);
 
-            c.CarRow(-15f, 52f, 0f, 4, 3.2f);
-            c.Car(5f, 58f, 0f, Car.Classic);
-            c.Car(11.5f, 58f, 0f, Car.Hatchback);
+            c.CarRow(-16f, 52f, 0f, 4, 3.2f);
+            c.Car(5f, 60f, 0f, Car.Classic);
+            c.Car(11.5f, 60f, 0f, Car.Hatchback);
 
-            c.Bay(8.3f, 58f, 0f, 3.2f, 6.5f);
+            c.Bay(8.3f, 60f, 0f, 3.2f, 6.5f);
         }
 
         private static void Rooftop(Writer c)
         {
             c.Start(0f, 4f);
 
+            c.PadAt(0f, 7f, 22f, 16f);
+            c.Rail(0f, 7f, 22f, 16f, 11f);
             c.Arrow(0f, 8f, 0f);
 
-            // The building, and the ramp climbing its flank.
-            c.Block(0f, 50f, 0f, 36f, 3.6f, 32f);
-            c.Ramp(0f, 14f, 0f, 36f, 9f, 3.8f);
-            c.Wall(-5.2f, 14f, -5.2f, 36f, 2.4f);
-            c.Wall(5.2f, 14f, 5.2f, 36f, 2.4f);
+            // The building the roof deck sits on, and the ramp climbing its flank.
+            c.Block(0f, 52f, 0f, 38f, 3.7f, 32f);
+            c.Ramp(0f, 15f, 0f, 37f, 9f, 3.8f);
+            c.Wall(-5.1f, 15f, -5.1f, 37f, 1.6f, 0.5f);
+            c.Wall(5.1f, 15f, 5.1f, 37f, 1.6f, 0.5f);
 
             c.Level(3.8f);
-            c.PadAt(0f, 52f, 36f, 28f);
+            c.PadAt(0f, 52f, 36f, 30f);
 
-            // Parapet all the way round the roof.
-            c.Wall(-17f, 38f, -17f, 66f, 1.3f, 0.5f, Part.ConcreteYellow);
-            c.Wall(17f, 38f, 17f, 66f, 1.3f, 0.5f, Part.ConcreteYellow);
-            c.Wall(-17f, 66f, 17f, 66f, 1.3f, 0.5f, Part.ConcreteYellow);
+            // Parapet all the way round the roof, open where the ramp arrives.
+            c.Wall(-18f, 37f, -18f, 67f, 1.3f, 0.5f, Part.ConcreteYellow);
+            c.Wall(18f, 37f, 18f, 67f, 1.3f, 0.5f, Part.ConcreteYellow);
+            c.Wall(-18f, 67f, 18f, 67f, 1.3f, 0.5f, Part.ConcreteYellow);
+            c.Wall(-18f, 37f, -5.1f, 37f, 1.3f, 0.5f, Part.ConcreteYellow);
+            c.Wall(5.1f, 37f, 18f, 37f, 1.3f, 0.5f, Part.ConcreteYellow);
 
-            c.CarRow(-14f, 60f, 180f, 4, 3.2f);
-            c.Car(4f, 62f, 180f, Car.Muscle);
-            c.Car(10.5f, 62f, 180f, Car.Sedan);
+            c.CarRow(-15f, 62f, 180f, 4, 3.2f);
+            c.Car(4f, 64f, 180f, Car.Muscle);
+            c.Car(10.5f, 64f, 180f, Car.Sedan);
 
-            c.Kerb(-16f, 44f, 16f, 44f);
-
-            c.Bay(7.3f, 62f, 180f, 3.0f, 6.4f);
+            c.Bay(7.3f, 64f, 180f, 3.0f, 6.4f);
         }
 
         private static void DrivingTest(Writer c)
@@ -841,14 +868,15 @@ namespace CarParkingGame.EditorTools
             c.Arrow(0f, 8f, 0f);
             c.Barriers(-12f, 70f, -12f, 76f, 3);
 
-            c.Bay(14f, 76f, 180f, 2.9f, 6.3f);
+            // Clear of the lane wall that brackets the final corner at z=74.9.
+            c.Bay(14f, 79f, 180f, 2.9f, 6.3f);
         }
 
         private static void Maze(Writer c)
         {
             c.Start(-20f, 4f);
 
-            Perimeter(c, 1.5f, 2.8f, 5f);
+            Perimeter(c, 1.5f, 2.8f, 5f, -20f);
 
             // Spine walls with gaps, giving lanes, dead ends and one way through.
             c.Wall(-14f, 10f, 20f, 10f, 2.4f);
@@ -875,32 +903,36 @@ namespace CarParkingGame.EditorTools
 
         private static void FinalExamination(Writer c)
         {
+            // Raised entrance, deck at site level - same reason as Down The Ramp.
+            const float Entrance = 2.4f;
+
+            c.Level(Entrance);
             c.Start(0f, 4f);
 
+            c.PadAt(0f, 7f, 22f, 16f, Entrance + 0.5f);
+            c.Rail(0f, 7f, 22f, 16f, 11f);
             c.Arrow(0f, 8f, 0f);
-            c.Wall(-9f, 2f, -9f, 14f, 2.4f);
-            c.Wall(9f, 2f, 9f, 14f, 2.4f);
 
-            c.Ramp(0f, 14f, 0f, 30f, 8f, -2.4f);
-            c.Wall(-4.6f, 14f, -4.6f, 30f, 2.4f);
-            c.Wall(4.6f, 14f, 4.6f, 30f, 2.4f);
+            c.Ramp(0f, 15f, 0f, 31f, 9f, -Entrance);
 
-            c.Level(-2.4f);
+            c.Level(0f);
             c.PadAt(0f, 52f, 44f, 44f);
 
-            c.Wall(-21f, 30f, -21f, 72f, 3f);
-            c.Wall(21f, 30f, 21f, 72f, 3f);
-            c.Wall(-21f, 72f, 21f, 72f, 3f);
+            c.Wall(-22f, 30f, -22f, 74f, 3f);
+            c.Wall(22f, 30f, 22f, 74f, 3f);
+            c.Wall(-22f, 74f, 22f, 74f, 3f);
+            c.Wall(-22f, 30f, -5.1f, 30f, 3f);
+            c.Wall(5.1f, 30f, 22f, 30f, 3f);
 
             c.Pillars(-16f, 38f, 16f, 38f, 5, 2.8f);
             c.Pillars(-16f, 52f, 16f, 52f, 5, 2.8f);
-            c.Pillars(-16f, 64f, 16f, 64f, 5, 2.8f);
+            c.Pillars(-16f, 66f, 16f, 66f, 5, 2.8f);
 
             c.CarRow(-19f, 44f, 0f, 3, 3.1f);
-            c.CarRow(10f, 44f, 0f, 3, 3.1f);
+            c.CarRow(8f, 44f, 0f, 3, 3.1f);
 
             c.Cones(-6f, 34f, 6f, 34f, 5);
-            c.Barriers(-10f, 58f, -4f, 58f, 3);
+            c.Barriers(-12f, 58f, -6f, 58f, 3);
 
             // The last space: parallel, against the wall, with a car at each end and a
             // metre at either end of the car. Nothing to spare, as advertised.

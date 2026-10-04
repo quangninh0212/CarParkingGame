@@ -38,9 +38,13 @@ Each course lays its own tarmac pad, so it needs flat empty ground rather than e
 
 Because the thirty missions are distinct places, they can all stand up at once, so **a challenge run is all thirty stages**. `MissionManager.MissionCount` / `HighestMissionId` replaced the old `BaseMissionCount` constant.
 
-**Every bay is painted as a closed yellow rectangle with a direction arrow inside it**, and the arrow is not decoration: the courses are configured with `allowOppositeHeading` off, so the car has to end up facing the way the arrow points, within 20°. Three sides and no arrow was not playable — from inside the car there is no way to tell whether a bay wants you nose in or tail in, and guessing wrong failed the heading check with nothing on screen to say why. The HUD's on-screen arrow to the bay (`BayGuideArrow`) now shows in **every** mode, not only challenge; a player dropped at the start of a practice course has no more idea where the bay is than one halfway round a challenge run.
+**Every bay in the game - the original eight as well as the twenty-two courses - is painted as a closed yellow rectangle with a direction arrow inside it**, and the arrow is not decoration: the courses are configured with `allowOppositeHeading` off, so the car has to end up facing the way the arrow points, within 20°. Three sides and no arrow was not playable — from inside the car there is no way to tell whether a bay wants you nose in or tail in, and guessing wrong failed the heading check with nothing on screen to say why. The HUD's on-screen arrow to the bay (`BayGuideArrow`) now shows in **every** mode, not only challenge; a player dropped at the start of a practice course has no more idea where the bay is than one halfway round a challenge run.
 
 The markings are **self-lit**. They sit on a flat dark pad under the circuit's existing lighting, where a plain yellow material renders near-black, and a bay the player cannot see is a bay they cannot park in.
+
+The original eight are painted by `Tools → Car Parking → Paint Original Mission Bays 1-8`. Their bays are the legacy `ParkingTrigger` plates, scaled to (1, 2.3, 0.19), so the paint cannot be parented to them or it would be squashed by the same factor; it goes on its own object at the zone's measured centre. That tool also settles which way each of those eight bays faces, since they were authored before anything read it: a forward or parallel bay faces the way the car arrives, a reverse bay faces back out of it.
+
+**Every course is walled on all four sides** with a gap where its own start point is, and the whole site has a wall round it. The courses stand on a raised slab, so before this, running wide anywhere dropped the car off the world. `Rail` is laid after the layout runs, so the entrance gap can follow the start point rather than being guessed at - centring it blindly walled the start in on every course that begins off to one side.
 
 Two things worth knowing about the courses:
 
@@ -48,6 +52,8 @@ Two things worth knowing about the courses:
 - **There are no ceilings over the underground decks.** The follow camera sits four metres up and would spend the level inside the slab. Pillars, walls and markings carry the idea instead.
 
 `MissionCourseBuilder` also writes each mission's `MissionDefinition` — name, description, parking type, difficulty, reward — because the catalog's old entries described the generated bays and no longer matched anything. Practice runs them untimed; challenge mode puts its own clock on every stage.
+
+`MissionCourseCheck` is the one that matters for playability. It stands a car-sized box at every mission's start point and bay and asks the physics engine whether it fits: floor underneath, nothing solid in the way, nothing roofed over it, and no hole in the floor between the two. It found six faults the renders had missed, including three courses whose own perimeter wall ran through their start point and two whose lower deck was buried inside the site slab - a course that digs below the site surface is inside seven metres of concrete, so the ramp courses now raise their entrance instead of sinking their deck.
 
 `MissionSiteShotTool` renders every mission onto one contact sheet, framed to its own bounds, with `-pitch` for an oblique view and `-only <id>` to look at one course closely. Run it after any change to the courses. It has earned its place repeatedly: it caught a bay laid on grass, courses built through trees, a site buried in the terrain, and — twice — courses that were built perfectly and were completely invisible, once because the capture camera was underground and once because `MaterialPropertyBlock` tints are runtime-only and never reached the saved scene. `CollisionProbeTool` now also checks that every mission has solid ground under its start point and its bay: the course pads were first spawned from the kit's flat-marking part, which the kit strips colliders from, so mission 9 looked right from every angle and dropped the car through the floor the moment it loaded. The pads are dark because of that last one: everything in the kit is cast from the same pale grey block, and without a tinted material asset a course is concrete walls on a concrete floor.
 
@@ -72,7 +78,7 @@ The HUD's car controls are five circular icon buttons on an arc over the brake p
 
 **Rebuilding:** run the tools in this order, each of which opens and saves the gameplay scene. The order matters — the site builder's box casts are meaningless until the scenery is solid:
 
-`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Mission Courses 9-30` → `Build Game UI` → `Check Game UI`, then `CollisionProbeTool` to confirm the car can still touch what it should
+`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Mission Courses 9-30` → `Paint Original Mission Bays 1-8` → `Build Game UI`, then the checks: `Check Mission Courses`, `Check Game UI`, `CollisionProbeTool`
 
 `Build Game UI` is safe to re-run: it lifts SimpleInput's steering wheel, pedals and brake out of the canvas before deleting it and puts them back afterwards. `Build Distinct Mission Sites 9-30` takes detached copies of the props it clones before deleting the old containers, for the same reason.
 
