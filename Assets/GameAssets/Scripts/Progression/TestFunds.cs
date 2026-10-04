@@ -1,34 +1,34 @@
 namespace CarParkingGame.Progression
 {
-    // A one-off pile of coins, so the garage can be tested without grinding fifty levels
-    // for it.
+    // A floor under the player's money while the game is being demonstrated, so the garage
+    // can be shown off - buy a car, repaint it, buy another - without the demo running out
+    // of coins halfway through.
     //
-    // It is granted once and recorded in the save, not topped up on every load. Topping up
-    // would make buying a car free in effect, and the thing being tested is whether buying
-    // one takes the money.
+    // It is a floor topped up when a save is loaded, not a grant and not a running cheat.
+    // Buying a car still takes the money, so a demo shows the price coming off; the next
+    // launch puts it back. Those two together are what a demo needs and a shipped game
+    // must not have.
     //
-    // Set Enabled to false before release. Coins already granted stay granted; turning it
-    // off only stops new saves being given any.
+    // Set Enabled to false before release. It goes off at the same time as
+    // MissionUnlocking.EveryMissionOpen - the two of them are the demo, and neither is
+    // meant to outlive it. Nothing else has to change: a save with coins already in it
+    // keeps them, and progress already earned is still there.
     public static class TestFunds
     {
-        // Not a const: a const would fold the guards that read it into unreachable code
-        // and the compiler would warn about every one of them.
+        // Not a const: a const would fold the guard that reads it into unreachable code
+        // and the compiler would warn about it.
         public static readonly bool Enabled = true;
 
         public const int Coins = 100000;
 
-        // Bumped to hand out another round to saves that already had the last one.
-        public const int CurrentGrant = 1;
-
-        public static bool TryGrant(SaveData data)
+        public static bool TryTopUp(SaveData data)
         {
-            if (!Enabled || data == null || data.testGrant >= CurrentGrant)
+            if (!Enabled || data == null || data.coins >= Coins)
             {
                 return false;
             }
 
-            data.testGrant = CurrentGrant;
-            data.coins += Coins;
+            data.coins = Coins;
             return true;
         }
     }

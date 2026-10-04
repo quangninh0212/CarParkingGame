@@ -40,6 +40,7 @@ namespace CarParkingGame.EditorTools
             CheckFirstRunShapedMigration(failures);
             CheckUnreadableFieldsAreRepaired(failures);
             CheckOutOfRangeValuesAreClamped(failures);
+            CheckTestFunds(failures);
 
             foreach (string failure in failures)
             {
@@ -47,6 +48,43 @@ namespace CarParkingGame.EditorTools
             }
 
             return failures.Count;
+        }
+
+        // What the demo money actually does, which is not what a grant would do.
+        //
+        // A demo has to start every session able to buy a car, and has to show the price
+        // coming off when it does. That means a floor applied when a save is loaded and
+        // nothing at all while one is being played - top it up as the player spends and
+        // buying looks free, which is the opposite of what the demo is for.
+        private static void CheckTestFunds(List<string> failures)
+        {
+            var data = SaveData.CreateDefault();
+            data.coins = 0;
+
+            bool toppedUp = TestFunds.TryTopUp(data);
+
+            if (!TestFunds.Enabled)
+            {
+                Check(failures, !toppedUp, "test funds are off, so an empty save should stay empty");
+                Check(failures, data.coins == 0, "test funds are off, so no coins should appear from nowhere");
+                return;
+            }
+
+            Check(failures, toppedUp, "test funds are on, so an empty save should be topped up");
+            Check(failures, data.coins == TestFunds.Coins, $"a topped-up save should hold {TestFunds.Coins} coins");
+
+            // Spending has to stick for as long as the session lasts.
+            data.coins -= 2500;
+            Check(failures, data.coins == TestFunds.Coins - 2500, "buying something should take the money");
+            Check(failures, TestFunds.TryTopUp(data), "the next load should put the demo money back");
+
+            // And a save that is already richer is left alone rather than cut down to the
+            // floor.
+            var rich = SaveData.CreateDefault();
+            rich.coins = TestFunds.Coins * 2;
+
+            Check(failures, !TestFunds.TryTopUp(rich), "a save above the floor should not be touched");
+            Check(failures, rich.coins == TestFunds.Coins * 2, "a save above the floor should keep its coins");
         }
 
         private static void CheckFreshInstallDefaults(List<string> failures)

@@ -55,10 +55,11 @@ namespace CarParkingGame.Core
 
             // Not in Sanitize: that is a repair function, and handing out money is not a
             // repair. It belongs at the one point where a file becomes the save being
-            // played, which happens once per run.
-            if (TestFunds.TryGrant(data))
+            // played, which happens once per run - so the demo starts every session with
+            // money, and spending it inside a session still costs what it says.
+            if (TestFunds.TryTopUp(data))
             {
-                Debug.Log($"[SaveManager] Test funds: {TestFunds.Coins} coins granted, {data.coins} in hand.");
+                Debug.Log($"[SaveManager] Test funds: topped up to {data.coins} coins for the demo. Turn TestFunds.Enabled off before release.");
                 Save();
             }
 

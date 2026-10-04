@@ -67,9 +67,6 @@ namespace CarParkingGame.Progression
         public int selectedCarIndex;
         public int coins;
         public int currentMissionId = FirstMissionId;
-
-        // Which round of test money this save has had. See TestFunds.
-        public int testGrant;
         public GameMode lastGameMode = GameMode.MainMenu;
         public List<CarSaveEntry> cars = new List<CarSaveEntry>();
         public List<MissionProgressData> missions = new List<MissionProgressData>();
