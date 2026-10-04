@@ -380,17 +380,22 @@ namespace CarParkingGame.EditorTools
                 return;
             }
 
-            // Where a driver's head would be: high in the cabin, a little behind its
-            // middle, on the driver's side. Checked by rendering what each of the cars
-            // actually sees from there; see VehicleViewShotTool.
+            // Where a driver's head would be: behind the windscreen, on the driver's side,
+            // with the cabin framing the view. Checked by rendering what each of the three
+            // cars actually sees from there; see VehicleViewShotTool.
             //
-            // The two numbers only work together. At 0.7 up the body the eye sat on the
-            // window line and the bonnet filled half the screen. Raising it to 1.1 cleared
-            // the bonnet but put the eye above the roof, so moving back into the cabin from
-            // there only brought the roof into shot. 0.95 is inside the cabin and high in
-            // it, which is what makes 0.12 read as sitting in the car rather than riding
-            // along on top of it.
-            points.EditorSetFractions(-0.42f, 0.12f, 0.95f, -0.45f, 1f);
+            // The cars do have cabins - pillars, roof, dash - and all of it was being
+            // missed, because the eye was never inside one. At 0.3 forward of the middle it
+            // sat over the bonnet; raising it to clear that bonnet only took it above the
+            // roof, so "inside the car" and "can see the road" read as a contradiction when
+            // they are not. Behind the middle of the body and below the roof line, they are
+            // the same place: the windscreen frames the road instead of hiding it.
+            //
+            // Height is the sensitive one. Too high and the roof takes the upper half of
+            // the screen; too low and the dash takes the lower half. 0.8 of the body's
+            // height centres the opening on all three cars, whose cabins sit at quite
+            // different heights.
+            points.EditorSetFractions(-0.42f, -0.10f, 0.80f, -0.45f, 1f);
             points.Measure();
             EditorUtility.SetDirty(points);
 
@@ -704,7 +709,10 @@ namespace CarParkingGame.EditorTools
 
             if (pitch != null)
             {
-                pitch.floatValue = 6f;
+                // Barely tilted. From inside a cabin the windscreen already decides how
+                // much road is in shot, and pitching down past this just points the view
+                // at the dashboard.
+                pitch.floatValue = 2f;
             }
 
             serialized.ApplyModifiedProperties();
