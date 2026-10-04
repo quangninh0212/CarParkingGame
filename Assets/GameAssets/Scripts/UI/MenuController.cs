@@ -52,12 +52,11 @@ namespace CarParkingGame.UI
 
         private GameObject current;
 
-        // Settings opened from the pause menu rather than from the home screen. Back out
-        // of it returns to the paused game, not to the main menu, and the showroom camera
-        // stays where it is instead of swinging round to a car that is not on screen.
-        private bool settingsOverPause;
+        // A menu screen opened from the pause menu rather than from the home screen. Back
+        // out of it returns to the paused game, not to the main menu.
+        private bool overPause;
 
-        public event System.Action SettingsClosedOverPause;
+        public event System.Action ClosedOverPause;
 
         private GameSession Session => session != null ? session : GameSession.Instance;
 
@@ -138,22 +137,26 @@ namespace CarParkingGame.UI
             Show(screen);
         }
 
-        // Shows the settings screen over a paused game. The caller switches menuRoot on
-        // first, which wakes this component and sends it home, so this has to run after
-        // that and put it where it actually belongs.
-        public void OpenSettingsOverPause()
+        // Shows one of the menu's screens over a paused game. The caller switches menuRoot
+        // on first, which wakes this component and sends it home, so these have to run
+        // after that and put it where it actually belongs.
+        public void OpenSettingsOverPause() => OpenOverPause(settingsScreen);
+
+        public void OpenGarageOverPause() => OpenOverPause(garageScreen);
+
+        private void OpenOverPause(GameObject screen)
         {
-            settingsOverPause = true;
+            overPause = true;
             history.Clear();
-            Show(settingsScreen);
+            Show(screen);
         }
 
         public void Back()
         {
-            if (settingsOverPause)
+            if (overPause)
             {
-                settingsOverPause = false;
-                SettingsClosedOverPause?.Invoke();
+                overPause = false;
+                ClosedOverPause?.Invoke();
                 return;
             }
 
@@ -175,9 +178,11 @@ namespace CarParkingGame.UI
                 candidate.SetActive(candidate == screen);
             }
 
-            // Left alone while the settings sit over a paused game: the player is looking
-            // at the level they are in, not at the showroom.
-            if (showroom != null && !settingsOverPause)
+            // The garage needs the showroom whether it was opened from the menu or over a
+            // paused level - a garage with no car in it is not a garage. Everything else
+            // leaves the camera alone while it sits over a level, because the player is
+            // looking at the level.
+            if (showroom != null && (!overPause || screen == garageScreen))
             {
                 showroom.SetFocus(screen == garageScreen ? ShowroomFocus.Garage : ShowroomFocus.Home);
             }
@@ -211,7 +216,7 @@ namespace CarParkingGame.UI
         private void OnModeChanged(GameplayMode mode)
         {
             bool inMenu = mode == GameplayMode.None;
-            settingsOverPause = false;
+            overPause = false;
 
             if (menuRoot != null)
             {

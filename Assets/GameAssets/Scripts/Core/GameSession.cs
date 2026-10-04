@@ -166,7 +166,13 @@ namespace CarParkingGame.Core
             EnterPlay(GameplayMode.Challenge);
             challengeStage = 0;
 
-            StartChallengeStage(1);
+            // Picks up where the last run stopped. A challenge run is fifty levels on a
+            // clock; being sent back to stage one for quitting at stage thirty is not a
+            // difficulty, it is a punishment for closing the game.
+            int highest = runner.HighestMissionId;
+            int resume = Mathf.Clamp(SaveManager.Data.challengeStage, 1, Mathf.Max(1, highest));
+
+            StartChallengeStage(resume);
         }
 
         public void StartFreeRoam()
@@ -206,6 +212,10 @@ namespace CarParkingGame.Core
 
             if (runner == null || next > runner.HighestMissionId)
             {
+                // The run is over. Clearing it means the next one starts at the beginning
+                // instead of resuming onto the last level for ever.
+                SaveManager.Data.challengeStage = 0;
+                SaveManager.Save();
                 return false;
             }
 
@@ -232,6 +242,12 @@ namespace CarParkingGame.Core
         {
             challengeStage = stage;
 
+            // Written before the level starts rather than after it is finished, because
+            // what has to survive quitting is which level the player was on, not which one
+            // they beat.
+            SaveManager.Data.challengeStage = stage;
+            SaveManager.Save();
+
             MissionManager runner = Missions;
 
             if (runner == null)
@@ -244,6 +260,32 @@ namespace CarParkingGame.Core
                 Debug.LogError($"[GameSession] Challenge stage {stage} has no layout; the run stops here.");
                 ReturnToMenu();
             }
+        }
+
+        // Puts the menu's showroom over a paused level and takes it away again, without
+        // leaving play.
+        //
+        // The garage is reachable from the pause menu, and a garage with no car in it is
+        // not a garage - but the mode must not change, or the session would tear the
+        // mission down and the player would lose the level they are standing in.
+        public void ShowShowroomOverPause(bool showing)
+        {
+            if (mode == GameplayMode.None)
+            {
+                return;
+            }
+
+            SetActive(menuCamera, showing);
+            SetActive(gameplayCamera, !showing);
+            SetActive(showroomCars, showing);
+            SetActive(mobileControls, false);
+        }
+
+        // Back to the level after the pause menu is done with it. The driving controls stay
+        // hidden until the player actually resumes.
+        public void RestoreGameplayCamera()
+        {
+            ShowShowroomOverPause(false);
         }
 
         private void EnterPlay(GameplayMode next)

@@ -67,6 +67,10 @@ namespace CarParkingGame.Progression
         public int selectedCarIndex;
         public int coins;
         public int currentMissionId = FirstMissionId;
+
+        // How far the last challenge run got, so quitting one and coming back resumes it
+        // rather than starting again at stage one. Zero means there is no run to resume.
+        public int challengeStage;
         public GameMode lastGameMode = GameMode.MainMenu;
         public List<CarSaveEntry> cars = new List<CarSaveEntry>();
         public List<MissionProgressData> missions = new List<MissionProgressData>();
@@ -204,6 +208,7 @@ namespace CarParkingGame.Progression
 
             coins = Mathf.Max(0, coins);
             selectedCarIndex = Mathf.Max(0, selectedCarIndex);
+            challengeStage = Mathf.Max(0, challengeStage);
             currentMissionId = Mathf.Max(FirstMissionId, currentMissionId);
 
             RemoveNullAndDuplicateEntries();

@@ -1,4 +1,5 @@
 using CarParkingGame.Core;
+using CarParkingGame.Garage;
 using CarParkingGame.Missions;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,8 +21,9 @@ namespace CarParkingGame.UI
         [SerializeField] private Button menuButton;
         [SerializeField] private Text modeLabel;
 
-        [Header("Settings, over the paused game")]
+        [Header("Menu screens, over the paused game")]
         [SerializeField] private Button settingsButton;
+        [SerializeField] private Button garageButton;
         [SerializeField] private MenuController menu;
         [SerializeField] private GameObject menuRoot;
 
@@ -34,6 +36,7 @@ namespace CarParkingGame.UI
             restartButton?.onClick.AddListener(OnRestart);
             menuButton?.onClick.AddListener(OnMenu);
             settingsButton?.onClick.AddListener(OnSettings);
+            garageButton?.onClick.AddListener(OnGarage);
 
             SetPanel(false);
         }
@@ -49,7 +52,12 @@ namespace CarParkingGame.UI
 
             if (menu != null)
             {
-                menu.SettingsClosedOverPause += OnSettingsClosed;
+                menu.ClosedOverPause += OnMenuScreenClosed;
+            }
+
+            if (GarageManager.Instance != null)
+            {
+                GarageManager.Instance.GarageChanged += OnGarageChanged;
             }
 
             SetPanel(active != null && active.IsPaused);
@@ -66,14 +74,23 @@ namespace CarParkingGame.UI
 
             if (menu != null)
             {
-                menu.SettingsClosedOverPause -= OnSettingsClosed;
+                menu.ClosedOverPause -= OnMenuScreenClosed;
+            }
+
+            if (GarageManager.Instance != null)
+            {
+                GarageManager.Instance.GarageChanged -= OnGarageChanged;
             }
         }
 
-        // The settings screen belongs to the main menu, so this shows the menu's root over
-        // the paused game rather than keeping a second copy of every slider in here. The
-        // session stays in play, so the level is still behind it when the player backs out.
-        private void OnSettings()
+        // Settings and the garage both belong to the main menu, so this shows the menu's
+        // root over the paused game rather than keeping a second copy of either in here.
+        // The session stays in play, so the level is still there when the player backs out.
+        private void OnSettings() => OpenMenuScreen(false);
+
+        private void OnGarage() => OpenMenuScreen(true);
+
+        private void OpenMenuScreen(bool garage)
         {
             if (menu == null || menuRoot == null)
             {
@@ -81,18 +98,58 @@ namespace CarParkingGame.UI
             }
 
             SetPanel(false);
+            carChanged = false;
+
+            // The garage has to show the car, which means the showroom, which means the
+            // menu camera. Settings does not, and leaving the level on screen behind it is
+            // better than cutting away from it.
+            if (garage)
+            {
+                Session?.ShowShowroomOverPause(true);
+            }
 
             // Switching the root on wakes MenuController, which sends itself home, so the
             // screen has to be chosen after that and not before.
             menuRoot.SetActive(true);
-            menu.OpenSettingsOverPause();
+
+            if (garage)
+            {
+                menu.OpenGarageOverPause();
+            }
+            else
+            {
+                menu.OpenSettingsOverPause();
+            }
         }
 
-        private void OnSettingsClosed()
+        // A different car, or the same one in a different colour, is a different car in the
+        // level - it is a separate object, parked wherever the garage left it. Restarting
+        // the level puts the new one on the start line. The level, not the run: a player
+        // who repaints at stage thirty keeps stage thirty.
+        private void OnGarageChanged()
+        {
+            GameSession active = Session;
+
+            if (active != null && active.Mode != GameplayMode.None && active.IsPaused)
+            {
+                carChanged = true;
+            }
+        }
+
+        private void OnMenuScreenClosed()
         {
             if (menuRoot != null)
             {
                 menuRoot.SetActive(false);
+            }
+
+            Session?.RestoreGameplayCamera();
+
+            if (carChanged)
+            {
+                carChanged = false;
+                OnRestart();
+                return;
             }
 
             GameSession active = Session;
@@ -173,6 +230,8 @@ namespace CarParkingGame.UI
         {
             Session?.ReturnToMenu();
         }
+
+        private bool carChanged;
 
         private void SetPanel(bool visible)
         {

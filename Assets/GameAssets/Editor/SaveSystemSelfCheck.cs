@@ -41,6 +41,7 @@ namespace CarParkingGame.EditorTools
             CheckUnreadableFieldsAreRepaired(failures);
             CheckOutOfRangeValuesAreClamped(failures);
             CheckTestFunds(failures);
+            CheckChallengeResumePoint(failures);
 
             foreach (string failure in failures)
             {
@@ -48,6 +49,30 @@ namespace CarParkingGame.EditorTools
             }
 
             return failures.Count;
+        }
+
+        // The stage a challenge run reached has to survive being written out and read
+        // back, because that is the whole point of it: the player quits the game at stage
+        // thirty and comes back to stage thirty.
+        private static void CheckChallengeResumePoint(List<string> failures)
+        {
+            var data = SaveData.CreateDefault();
+
+            Check(failures, data.challengeStage == 0, "a fresh save should have no challenge run to resume");
+
+            data.challengeStage = 30;
+
+            var round = JsonUtility.FromJson<SaveData>(JsonUtility.ToJson(data));
+            round.Sanitize();
+
+            Check(failures, round.challengeStage == 30, "the challenge stage should survive a save and a load");
+
+            // A file hand-edited to nonsense resumes at the beginning rather than at a
+            // stage that does not exist.
+            round.challengeStage = -5;
+            round.Sanitize();
+
+            Check(failures, round.challengeStage == 0, "a negative challenge stage should be repaired to none");
         }
 
         // What the demo money actually does, which is not what a grant would do.

@@ -1017,7 +1017,7 @@ namespace CarParkingGame.EditorTools
             Image dim = CreateImage(screen.transform, "Dim", Dim);
             Stretch(dim.gameObject);
 
-            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 664f), PanelColor);
+            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 766f), PanelColor);
 
             Text title = CreateLabel(panel.transform, "Title", "PAUSED", 46, TextAnchor.MiddleCenter);
             SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(600f, 56f), new Vector2(0.5f, 0.5f));
@@ -1028,8 +1028,9 @@ namespace CarParkingGame.EditorTools
 
             Button resume = WideButton(panel.transform, "ResumeButton", "RESUME", new Vector2(0.5f, 1f), new Vector2(0f, -210f), new Vector2(480f, 88f), AccentColor);
             Button restart = WideButton(panel.transform, "RestartButton", "RESTART", new Vector2(0.5f, 1f), new Vector2(0f, -312f), new Vector2(480f, 88f), ButtonColor);
-            Button settings = WideButton(panel.transform, "SettingsButton", "SETTINGS", new Vector2(0.5f, 1f), new Vector2(0f, -414f), new Vector2(480f, 88f), ButtonColor);
-            Button menu = WideButton(panel.transform, "MenuButton", "MAIN MENU", new Vector2(0.5f, 1f), new Vector2(0f, -516f), new Vector2(480f, 88f), ButtonColor);
+            Button garage = WideButton(panel.transform, "GarageButton", "GARAGE", new Vector2(0.5f, 1f), new Vector2(0f, -414f), new Vector2(480f, 88f), ButtonColor);
+            Button settings = WideButton(panel.transform, "SettingsButton", "SETTINGS", new Vector2(0.5f, 1f), new Vector2(0f, -516f), new Vector2(480f, 88f), ButtonColor);
+            Button menu = WideButton(panel.transform, "MenuButton", "MAIN MENU", new Vector2(0.5f, 1f), new Vector2(0f, -618f), new Vector2(480f, 88f), ButtonColor);
 
             // The pause button lives on the canvas, not inside this screen, because it has
             // to be reachable while the screen is hidden.
@@ -1044,6 +1045,7 @@ namespace CarParkingGame.EditorTools
             SetPrivate(view, "menuButton", menu);
             SetPrivate(view, "modeLabel", modeLabel);
             SetPrivate(view, "settingsButton", settings);
+            SetPrivate(view, "garageButton", garage);
 
             AddVisibility(canvasObject, new Object[] { pauseButton.gameObject }, false);
 
