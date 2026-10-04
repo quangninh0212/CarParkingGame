@@ -207,6 +207,17 @@ namespace CarParkingGame.EditorTools
             SetText(hud.Find("InfoPanel/Score"), "92");
             SetText(hud.Find("InfoPanel/Coins"), "1200");
             SetText(hud.Find("TimerChip/Timer"), "1:24");
+
+            // The bay counter is off until a level says it wants more than one, so the
+            // shot has to switch it on to show what it looks like when one does.
+            Transform bayChip = hud.Find("BayChip");
+
+            if (bayChip != null)
+            {
+                bayChip.gameObject.SetActive(true);
+                SetText(bayChip.Find("BayCount"), "1/3");
+            }
+
             SetText(hud.Find("SpeedPanel/Speed"), "18");
             SetText(hud.Find("ParkingFeedback/Hint"), "Straighten up");
 
