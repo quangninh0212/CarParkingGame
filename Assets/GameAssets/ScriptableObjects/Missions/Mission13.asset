@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission13
   m_EditorClassIdentifier: 
   missionId: 13
-  displayName: Narrow Lane
-  description: Follow a narrow road to the bay without scraping.
+  displayName: Tight Corners
+  description: A service road with two square corners and concrete on both sides.
   difficulty: 3
   parkingType: 0
   timeLimitSeconds: 0
-  failOnTimeout: 0
+  failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 14
+  angleToleranceDegrees: 15
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

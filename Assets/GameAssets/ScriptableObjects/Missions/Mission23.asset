@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission23
   m_EditorClassIdentifier: 
   missionId: 23
-  displayName: Timed Parallel
-  description: A parallel park under time pressure.
-  difficulty: 4
-  parkingType: 2
-  timeLimitSeconds: 60
+  displayName: Car Park Deck
+  description: Wide lanes between the pillars and a bay near the entrance.
+  difficulty: 3
+  parkingType: 0
+  timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 12
-  holdSeconds: 1.6
-  requiredContainment: 0.95
+  angleToleranceDegrees: 15
+  holdSeconds: 1.5
+  requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission21
   m_EditorClassIdentifier: 
   missionId: 21
-  displayName: Against The Clock
-  description: Straight park, now timed.
-  difficulty: 3
+  displayName: Container Maze
+  description: Corridors of containers, square corners, bay at the far end.
+  difficulty: 4
   parkingType: 0
-  timeLimitSeconds: 45
+  timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 14
+  angleToleranceDegrees: 15
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 600
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

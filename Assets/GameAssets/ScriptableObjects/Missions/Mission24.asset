@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission24
   m_EditorClassIdentifier: 
   missionId: 24
-  displayName: Timed Slalom
-  description: Slalom and reverse park against the clock.
+  displayName: Pillars And Posts
+  description: The same deck with half the room and a slot on the back wall.
   difficulty: 5
   parkingType: 1
-  timeLimitSeconds: 70
+  timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 11
-  holdSeconds: 1.6
-  requiredContainment: 0.95
+  angleToleranceDegrees: 15
+  holdSeconds: 1.5
+  requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 700
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

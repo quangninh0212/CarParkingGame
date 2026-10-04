@@ -28,16 +28,24 @@ Three game modes, reached from **PLAY** or **GAME MODE** on the home screen:
 | Mode | What it does |
 | --- | --- |
 | Practice | One stage at a time, car placed on the start line, only that stage's props in the world. Clearing a stage unlocks the next. |
-| Challenge | All eight distinct bays standing at once, played in order on a per-stage clock (`GameSession.challengeSecondsPerStage`, 120s). The car is **not** teleported between stages: driving to the next bay is the mode, and an on-screen arrow points at it with the distance. |
+| Challenge | All thirty courses standing at once, played in order on a per-stage clock (`GameSession.challengeSecondsPerStage`, 120s). The car is **not** teleported between stages: driving to the next bay is the mode, and an on-screen arrow points at it with the distance. |
 | Free drive | No missions, no timer, every mission's props hidden. |
 
-Missions 9–30 are clones of 1–8 at the same world positions, so a challenge run is only the eight distinct bays (`MissionManager.BaseMissionCount`).
 
-**Missions 9–30 are now twenty-two distinct places on the track**, not clones of 1–8 at the same world positions. `MissionSiteBuilder` samples the ground on a 5 m grid, raycasts each sample, keeps only the ones that land on a drivable surface by name (tarmac, pit lane, concrete — never grass, gravel or sand), and then tests each in eight headings with two box casts: one for the bay, one for the 20 m approach lane. That test only means anything because the scenery has colliders now. Sites are spaced at least 40 m apart and shuffled with a fixed seed, so a rebuild puts them back in the same places.
+**Missions 9–30 are twenty-two authored courses on a training site south of the circuit** — a slalom, an L-bend, an S-bend, a walled lane, a supermarket car park, a bus station, a container yard, parking decks, ramps, a maze and a final exam. Each is a method in `MissionCourseLibrary` written in its own local space with `+Z` the way the car faces at the start, so a layout reads as a drawing and can be moved without changing a coordinate. `MissionCourseKit` holds the parts and sizes every prefab to real metres from its own bounds.
 
-Because the thirty sites are distinct, they can all stand up at once, so **a challenge run is all thirty stages**, not eight. `MissionManager.MissionCount` / `HighestMissionId` replaced the old `BaseMissionCount` constant.
+Each course lays its own tarmac pad, so it needs flat empty ground rather than existing tarmac, and the courses are **packed together as one site rather than scattered**. Scattering was tried twice and does not work on this map: twenty-two flat, tree-free plots of forty metres and up do not exist on a wooded racetrack, and a sweep of every plot at four headings placed nine of them. Packed, the whole set fits in 226x322m, costs nothing to find, and lands in the same place on every rebuild. The site is anchored to the circuit's south edge and stepped outward until nothing is in the way, with the apron's margin lapping onto the terrain so the player can drive across to it.
 
-`MissionSiteShotTool` renders every bay from directly above onto one contact sheet. Run it after any change to the sites: the raycast proves the ground is flat, drivable and clear, and proves nothing about whether a bay landed somewhere that reads as a car park.
+Because the thirty missions are distinct places, they can all stand up at once, so **a challenge run is all thirty stages**. `MissionManager.MissionCount` / `HighestMissionId` replaced the old `BaseMissionCount` constant.
+
+Two things worth knowing about the courses:
+
+- **The themed dressing is stand-in.** The project has no models for buses, fuel pumps, forklifts, shipping containers or trolley shelters, so those are sized concrete blocks. The driving problem each level poses — the gaps, the corners, the sight lines — is the real thing; swap the blocks for art when there is any.
+- **There are no ceilings over the underground decks.** The follow camera sits four metres up and would spend the level inside the slab. Pillars, walls and markings carry the idea instead.
+
+`MissionCourseBuilder` also writes each mission's `MissionDefinition` — name, description, parking type, difficulty, reward — because the catalog's old entries described the generated bays and no longer matched anything. Practice runs them untimed; challenge mode puts its own clock on every stage.
+
+`MissionSiteShotTool` renders every mission onto one contact sheet, framed to its own bounds, with `-pitch` for an oblique view and `-only <id>` to look at one course closely. Run it after any change to the courses. It has earned its place repeatedly: it caught a bay laid on grass, courses built through trees, a site buried in the terrain, and — twice — courses that were built perfectly and were completely invisible, once because the capture camera was underground and once because `MaterialPropertyBlock` tints are runtime-only and never reached the saved scene. The pads are dark because of that last one: everything in the kit is cast from the same pale grey block, and without a tinted material asset a course is concrete walls on a concrete floor.
 
 Four bugs from the report, and what was actually wrong:
 
@@ -60,7 +68,7 @@ The HUD's car controls are five circular icon buttons on an arc over the brake p
 
 **Rebuilding:** run the tools in this order, each of which opens and saves the gameplay scene. The order matters — the site builder's box casts are meaningless until the scenery is solid:
 
-`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Distinct Mission Sites 9-30` → `Build Game UI` → `Check Game UI`, then `CollisionProbeTool` to confirm the car can still touch what it should
+`Make Track Scenery Solid` → `Dress Cars With Lights And Horn` → `Build Mission Courses 9-30` → `Build Game UI` → `Check Game UI`, then `CollisionProbeTool` to confirm the car can still touch what it should
 
 `Build Game UI` is safe to re-run: it lifts SimpleInput's steering wheel, pedals and brake out of the canvas before deleting it and puts them back afterwards. `Build Distinct Mission Sites 9-30` takes detached copies of the props it clones before deleting the old containers, for the same reason.
 
@@ -69,7 +77,7 @@ The HUD's car controls are five circular icon buttons on an arc over the brake p
 **Still needs an Editor eyeball** (it cannot be checked from the command line):
 - The headlamp spheres on each car. They are plain objects under `PlaceholderLights`; drag them if they sit proud of the bodywork.
 - Whether 120s per challenge stage is enough now that a run is thirty stages and the car drives between them (`GameSession` → Challenge mode → Challenge Seconds Per Stage).
-- Several of the new bays sit on the live racing line. That is what the map has — it is a circuit, not a car park — but move any that read badly; each one is a `MissionNN_Site` root you can drag.
+- Every one of the twenty-two courses, driven. They are laid out to be completable and the bays are sized against the car's measured footprint, but whether a gap feels tight or impossible is not something a top-down render can answer. Each is a `MissionNN_<name>` root you can drag or edit.
 
 ### Missions
 

@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission17
   m_EditorClassIdentifier: 
   missionId: 17
-  displayName: Garage Entry
-  description: Drive into a covered garage bay.
+  displayName: Petrol Station
+  description: Round the pumps and in beside the shop.
   difficulty: 3
   parkingType: 0
   timeLimitSeconds: 0
-  failOnTimeout: 0
+  failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 13
+  angleToleranceDegrees: 15
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

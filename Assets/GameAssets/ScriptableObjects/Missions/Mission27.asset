@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission27
   m_EditorClassIdentifier: 
   missionId: 27
-  displayName: Multi-Storey Squeeze
-  description: The tightest bay in the building.
+  displayName: Rooftop
+  description: Climb to the roof deck and reverse in against the parapet.
   difficulty: 5
   parkingType: 1
-  timeLimitSeconds: 75
+  timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 10
-  holdSeconds: 1.7
-  requiredContainment: 1
+  angleToleranceDegrees: 15
+  holdSeconds: 1.5
+  requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 700
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

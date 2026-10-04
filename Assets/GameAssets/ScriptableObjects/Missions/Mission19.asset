@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission19
   m_EditorClassIdentifier: 
   missionId: 19
-  displayName: Tight Garage
-  description: A garage bay with almost no margin.
-  difficulty: 5
+  displayName: Bus Station
+  description: Reverse into the gap between two coaches.
+  difficulty: 4
   parkingType: 1
   timeLimitSeconds: 0
-  failOnTimeout: 0
+  failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 10
-  holdSeconds: 1.7
-  requiredContainment: 1
+  angleToleranceDegrees: 15
+  holdSeconds: 1.5
+  requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 600
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

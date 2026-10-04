@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: Mission12
   m_EditorClassIdentifier: 
   missionId: 12
-  displayName: Reverse Parallel
-  description: Back into the parallel space the way an examiner expects.
-  difficulty: 4
-  parkingType: 2
+  displayName: Between Walls
+  description: A straight lane with a hand's width either side of the mirrors.
+  difficulty: 3
+  parkingType: 0
   timeLimitSeconds: 0
-  failOnTimeout: 0
+  failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 12
-  holdSeconds: 1.6
-  requiredContainment: 0.95
+  angleToleranceDegrees: 15
+  holdSeconds: 1.5
+  requiredContainment: 0.9
   allowOppositeHeading: 1
-  coinReward: 300
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}
