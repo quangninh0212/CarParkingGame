@@ -270,6 +270,12 @@ namespace CarParkingGame.EditorTools
             RenderTexture previousActive = RenderTexture.active;
 
             camera.targetTexture = buffer;
+
+            // Twice. The first frame of a batch session comes back before the shadows and
+            // the sky have settled, so whichever course happened to be rendered first came
+            // out washed out and pale - which reads as a course built out of the wrong
+            // material, and sent me looking for a fault that was not there.
+            camera.Render();
             camera.Render();
 
             RenderTexture.active = buffer;
