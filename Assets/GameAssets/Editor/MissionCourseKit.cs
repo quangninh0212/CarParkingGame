@@ -99,6 +99,10 @@ namespace CarParkingGame.EditorTools
         // instead of carrying a y through every call.
         public float BaseY { get; set; }
 
+        // What a car parked as scenery is called, so a check written later can pick them
+        // out of a course without knowing which prefabs the kit happens to use.
+        public const string ParkedCarPrefix = "ParkedCar ";
+
         // Road paint, so: wide and all but flat. A narrow strip standing 10cm proud is a
         // kerb seen edge on from a driver's eye - all shadowed side, almost no top face -
         // and it reads as a dark line rather than as paint.
@@ -145,12 +149,30 @@ namespace CarParkingGame.EditorTools
         // of cars that all think they are the player's.
         public GameObject SpawnCar(CarModel model, Transform parent, Vector3 localPosition, float yawDegrees)
         {
-            GameObject instance = SpawnPath(CarPaths[model], parent, localPosition, yawDegrees, Vector3.zero);
+            string path = CarPaths[model];
+            GameObject instance = SpawnPath(path, parent, localPosition, yawDegrees, Vector3.zero);
 
             if (instance == null)
             {
                 return null;
             }
+
+            // Stood on the road, not hung off its own pivot.
+            //
+            // The five car prefabs put their origins in five different places - some at
+            // the wheel contact patch, some on the axle line, some at the middle of the
+            // body - so placing them all by the pivot stood a few of them correctly and
+            // sank the rest into the tarmac up to the sills. Nothing about a prefab's
+            // origin is worth trusting; where its tyres are is measurable.
+            Vector3 natural = Measure(path);
+            Vector3 centre = MeasureCentre(path);
+            float bottom = centre.y - natural.y * 0.5f;
+
+            instance.transform.localPosition = localPosition - Vector3.up * bottom;
+
+            // Named so the course checker can find them and confirm they are standing on
+            // something.
+            instance.name = ParkedCarPrefix + model;
 
             foreach (MonoBehaviour behaviour in instance.GetComponentsInChildren<MonoBehaviour>(true))
             {

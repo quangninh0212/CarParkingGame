@@ -139,6 +139,100 @@ namespace CarParkingGame.EditorTools
             // And, where the course recorded the lane it wants driven, that a car actually
             // fits down it.
             CheckRoutes(mission, problems);
+
+            CheckParkedCars(mission, problems);
+        }
+
+        // Every car parked as scenery is sitting on the road rather than in it.
+        //
+        // A car placed by its prefab's own origin lands wherever that origin happens to
+        // be, and the five models in the kit disagree about where that is. From above a
+        // sunk car looks like a parked car; from the driving seat it is a roof lying on
+        // the tarmac.
+        private static void CheckParkedCars(MissionAuthoring mission, List<string> problems)
+        {
+            // A car body is not a flat-bottomed box, so a few centimetres either way is
+            // the model, not a fault.
+            const float Tolerance = 0.12f;
+
+            foreach (Transform candidate in mission.GetComponentsInChildren<Transform>(true))
+            {
+                if (!candidate.name.StartsWith(MissionCourseKit.ParkedCarPrefix))
+                {
+                    continue;
+                }
+
+                if (!TryMeasureWorldBounds(candidate, out Bounds car))
+                {
+                    continue;
+                }
+
+                if (!TryFloorUnder(candidate, car, out float road))
+                {
+                    problems.Add($"Mission {mission.MissionId}: nothing under '{candidate.name}' at {car.center:0.0}.");
+                    return;
+                }
+
+                float gap = car.min.y - road;
+
+                if (gap < -Tolerance)
+                {
+                    problems.Add($"Mission {mission.MissionId}: '{candidate.name}' at {car.center:0.0} is sunk {-gap:0.00}m into the road.");
+                    return;
+                }
+
+                if (gap > Tolerance)
+                {
+                    problems.Add($"Mission {mission.MissionId}: '{candidate.name}' at {car.center:0.0} is floating {gap:0.00}m above the road.");
+                    return;
+                }
+            }
+        }
+
+        // The road under a car, ignoring the car itself: it has a collider of its own and
+        // a ray dropped through it would otherwise stop on its roof.
+        private static bool TryFloorUnder(Transform car, Bounds bounds, out float height)
+        {
+            height = 0f;
+
+            var from = new Vector3(bounds.center.x, bounds.max.y + 2f, bounds.center.z);
+            RaycastHit[] hits = Physics.RaycastAll(from, Vector3.down, 20f);
+
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider.isTrigger || hit.collider.transform.IsChildOf(car))
+                {
+                    continue;
+                }
+
+                height = hit.point.y;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryMeasureWorldBounds(Transform root, out Bounds bounds)
+        {
+            bounds = new Bounds();
+            bool any = false;
+
+            foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!any)
+                {
+                    bounds = renderer.bounds;
+                    any = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+
+            return any;
         }
 
         // Sweeps a car-width box along every route the course recorded.
