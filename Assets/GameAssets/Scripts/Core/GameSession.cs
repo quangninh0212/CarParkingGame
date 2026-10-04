@@ -1,5 +1,6 @@
 using System;
 using CarParkingGame.Missions;
+using CarParkingGame.UI;
 using CarParkingGame.Vehicle;
 using UnityEngine;
 
@@ -151,8 +152,7 @@ namespace CarParkingGame.Core
             return false;
         }
 
-        // Every bay in the map at once, one after another, on a clock. The car is not
-        // teleported between stages: driving to the next bay is the mode.
+        // Every level in turn, on a clock, with the car set down at each one.
         public void StartChallenge()
         {
             MissionManager runner = Missions;
@@ -166,7 +166,6 @@ namespace CarParkingGame.Core
             EnterPlay(GameplayMode.Challenge);
             challengeStage = 0;
 
-            runner.SetAllEnvironmentsActive(true);
             StartChallengeStage(1);
         }
 
@@ -215,6 +214,21 @@ namespace CarParkingGame.Core
         }
 
         private void StartChallengeStage(int stage)
+        {
+            ScreenFade fade = ScreenFade.Instance;
+
+            if (fade == null)
+            {
+                SwitchToStage(stage);
+                return;
+            }
+
+            // Behind the black, so the player does not watch the car and the whole lot
+            // around it be replaced.
+            fade.Cover(() => SwitchToStage(stage));
+        }
+
+        private void SwitchToStage(int stage)
         {
             challengeStage = stage;
 

@@ -52,6 +52,13 @@ namespace CarParkingGame.UI
 
         private GameObject current;
 
+        // Settings opened from the pause menu rather than from the home screen. Back out
+        // of it returns to the paused game, not to the main menu, and the showroom camera
+        // stays where it is instead of swinging round to a car that is not on screen.
+        private bool settingsOverPause;
+
+        public event System.Action SettingsClosedOverPause;
+
         private GameSession Session => session != null ? session : GameSession.Instance;
 
         private void Awake()
@@ -131,8 +138,25 @@ namespace CarParkingGame.UI
             Show(screen);
         }
 
+        // Shows the settings screen over a paused game. The caller switches menuRoot on
+        // first, which wakes this component and sends it home, so this has to run after
+        // that and put it where it actually belongs.
+        public void OpenSettingsOverPause()
+        {
+            settingsOverPause = true;
+            history.Clear();
+            Show(settingsScreen);
+        }
+
         public void Back()
         {
+            if (settingsOverPause)
+            {
+                settingsOverPause = false;
+                SettingsClosedOverPause?.Invoke();
+                return;
+            }
+
             if (history.Count == 0)
             {
                 Show(homeScreen);
@@ -151,7 +175,9 @@ namespace CarParkingGame.UI
                 candidate.SetActive(candidate == screen);
             }
 
-            if (showroom != null)
+            // Left alone while the settings sit over a paused game: the player is looking
+            // at the level they are in, not at the showroom.
+            if (showroom != null && !settingsOverPause)
             {
                 showroom.SetFocus(screen == garageScreen ? ShowroomFocus.Garage : ShowroomFocus.Home);
             }
@@ -185,6 +211,7 @@ namespace CarParkingGame.UI
         private void OnModeChanged(GameplayMode mode)
         {
             bool inMenu = mode == GameplayMode.None;
+            settingsOverPause = false;
 
             if (menuRoot != null)
             {

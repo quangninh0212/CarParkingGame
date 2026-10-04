@@ -4,6 +4,7 @@ using CarParkingGame.Garage;
 using CarParkingGame.Missions;
 using CarParkingGame.Settings;
 using CarParkingGame.UI;
+using CarParkingGame.Vehicle;
 using SimpleInputNamespace;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -115,6 +116,14 @@ namespace CarParkingGame.EditorTools
             AddVisibility(canvasObject, new Object[] { menuRoot }, true);
 
             SetPrivate(menu, "menuRoot", menuRoot);
+
+            // The pause screen borrows the menu own settings screen rather than keeping a
+            // second copy of it, so it needs to know where the menu lives.
+            var pauseView = canvasObject.GetComponent<PauseMenuView>();
+            SetPrivate(pauseView, "menu", menu);
+            SetPrivate(pauseView, "menuRoot", menuRoot);
+
+            BuildScreenFade(canvas, canvasObject);
 
             WireSessionObjects(session, hud, pause);
             EnableGarageManager();
@@ -249,6 +258,7 @@ namespace CarParkingGame.EditorTools
 
             BuildHudReadouts(hud, out Text missionName, out Text score, out Text coins, out Text timer, out GameObject timerChip);
             BuildBayCounter(hud, out Text bayCount, out GameObject bayChip);
+            BuildRearViewMirror(hud);
             BuildSpeedometer(hud);
             BuildParkingFeedback(hud, out Image indicator, out Image progress, out Text hint);
             BuildGuideArrow(hud);
@@ -322,6 +332,35 @@ namespace CarParkingGame.EditorTools
 
             // Off until a mission says otherwise, so a one-bay course never shows it.
             chip.SetActive(false);
+        }
+
+        // The strip of glass across the top of the screen, and the component that renders
+        // the world behind the car into it. Top centre, which is where a driver looks for
+        // a mirror and where nothing else on the HUD lives.
+        private static void BuildRearViewMirror(GameObject hud)
+        {
+            // Offset right of centre rather than dead centre. The mission panel runs to
+            // x = 760 on the left and the bay counter starts at 1454 on the right, so a
+            // mirror centred on the canvas sits on top of the coin count.
+            GameObject frame = CreatePanel(hud.transform, "RearMirror", new Vector2(0.5f, 1f),
+                new Vector2(110f, -84f), new Vector2(580f, 160f), new Color(0.07f, 0.07f, 0.08f, 0.95f));
+
+            GameObject surface = CreateChild(frame.transform, "Glass");
+            var glass = surface.AddComponent<RawImage>();
+
+            // Inset, so the dark panel reads as the bezel round the glass.
+            SetRect(glass.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(556f, 136f), new Vector2(0.5f, 0.5f));
+
+            // Nothing to press. Left on, the mirror would eat taps meant for the HUD
+            // underneath it.
+            glass.raycastTarget = false;
+
+            var mirror = hud.AddComponent<RearViewMirror>();
+            SetPrivate(mirror, "glass", glass);
+            SetPrivate(mirror, "frame", frame);
+
+            // Off until there is a car to be behind it.
+            frame.SetActive(false);
         }
 
         private static void BuildSpeedometer(GameObject hud)
@@ -923,6 +962,22 @@ namespace CarParkingGame.EditorTools
             return screen;
         }
 
+        // The black that a challenge run swaps levels behind. Built last so it is the last
+        // child of the canvas, which is what puts it over everything else.
+        private static void BuildScreenFade(Transform canvas, GameObject canvasObject)
+        {
+            Image sheet = CreateImage(canvas, "ScreenFade", new Color(0f, 0f, 0f, 0f));
+            Stretch(sheet.gameObject);
+
+            // Nothing in it to press, and it must not swallow presses meant for whatever is
+            // underneath it.
+            sheet.raycastTarget = false;
+            sheet.gameObject.SetActive(false);
+
+            var fade = canvasObject.AddComponent<ScreenFade>();
+            SetPrivate(fade, "sheet", sheet);
+        }
+
         // ================= pause and results ====================================================
 
         private static GameObject BuildPauseScreen(Transform parent, GameSession session, GameObject canvasObject)
@@ -933,7 +988,7 @@ namespace CarParkingGame.EditorTools
             Image dim = CreateImage(screen.transform, "Dim", Dim);
             Stretch(dim.gameObject);
 
-            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 560f), PanelColor);
+            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 664f), PanelColor);
 
             Text title = CreateLabel(panel.transform, "Title", "PAUSED", 46, TextAnchor.MiddleCenter);
             SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(600f, 56f), new Vector2(0.5f, 0.5f));
@@ -944,7 +999,8 @@ namespace CarParkingGame.EditorTools
 
             Button resume = WideButton(panel.transform, "ResumeButton", "RESUME", new Vector2(0.5f, 1f), new Vector2(0f, -210f), new Vector2(480f, 88f), AccentColor);
             Button restart = WideButton(panel.transform, "RestartButton", "RESTART", new Vector2(0.5f, 1f), new Vector2(0f, -312f), new Vector2(480f, 88f), ButtonColor);
-            Button menu = WideButton(panel.transform, "MenuButton", "MAIN MENU", new Vector2(0.5f, 1f), new Vector2(0f, -414f), new Vector2(480f, 88f), ButtonColor);
+            Button settings = WideButton(panel.transform, "SettingsButton", "SETTINGS", new Vector2(0.5f, 1f), new Vector2(0f, -414f), new Vector2(480f, 88f), ButtonColor);
+            Button menu = WideButton(panel.transform, "MenuButton", "MAIN MENU", new Vector2(0.5f, 1f), new Vector2(0f, -516f), new Vector2(480f, 88f), ButtonColor);
 
             // The pause button lives on the canvas, not inside this screen, because it has
             // to be reachable while the screen is hidden.
@@ -958,6 +1014,7 @@ namespace CarParkingGame.EditorTools
             SetPrivate(view, "restartButton", restart);
             SetPrivate(view, "menuButton", menu);
             SetPrivate(view, "modeLabel", modeLabel);
+            SetPrivate(view, "settingsButton", settings);
 
             AddVisibility(canvasObject, new Object[] { pauseButton.gameObject }, false);
 

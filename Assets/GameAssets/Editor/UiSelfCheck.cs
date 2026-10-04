@@ -75,6 +75,8 @@ namespace CarParkingGame.EditorTools
             CheckReferences<MissionResultView>(problems, "mainMenu");
             CheckReferences<SettingsView>(problems);
             CheckReferences<ShowroomCameraRig>(problems);
+            CheckReferences<ScreenFade>(problems);
+            CheckReferences<CarParkingGame.Vehicle.RearViewMirror>(problems);
 
             CheckLegacyUiIsOff(problems);
             CheckScreensAreExclusive(problems);

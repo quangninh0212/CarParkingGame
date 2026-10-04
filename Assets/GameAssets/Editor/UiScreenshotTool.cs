@@ -59,6 +59,7 @@ namespace CarParkingGame.EditorTools
             canvas.planeDistance = 1f;
 
             ShowroomCameraRig rig = PrepareShowroom();
+            PaintShowroomCars();
 
             Transform menuRoot = canvasObject.transform.Find("MenuRoot");
             Transform hud = canvasObject.transform.Find("HUD");
@@ -83,6 +84,31 @@ namespace CarParkingGame.EditorTools
 
             Debug.Log($"[UiScreenshotTool] Wrote screen captures to '{directory}' at {width}x{height}.");
             EditorApplication.Exit(0);
+        }
+
+        // The showroom cars are painted a colour nothing on them already is, so the
+        // garage shot shows which parts of a car the garage actually repaints. Painting
+        // the whole car - glass, lamps, tyres and all - is a fault a player has reported
+        // once already, and it is invisible in a shot of a car left its own colour.
+        private static void PaintShowroomCars()
+        {
+            var sample = new Color(0.16f, 0.42f, 0.95f);
+            int painted = 0;
+
+            foreach (CarPaintTarget paint in UnityEngine.Object.FindObjectsByType<CarPaintTarget>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (!paint.HasTargets)
+                {
+                    Debug.LogWarning($"[UiScreenshotTool] '{paint.name}' has no paint slots.", paint);
+                    continue;
+                }
+
+                paint.Apply(sample);
+                painted++;
+            }
+
+            Debug.Log($"[UiScreenshotTool] Painted {painted} car(s) for the shot.");
         }
 
         private static IEnumerable<KeyValuePair<string, ShowroomFocus>> Screens()
@@ -207,6 +233,23 @@ namespace CarParkingGame.EditorTools
             SetText(hud.Find("InfoPanel/Score"), "92");
             SetText(hud.Find("InfoPanel/Coins"), "1200");
             SetText(hud.Find("TimerChip/Timer"), "1:24");
+
+            // The mirror only renders while a car is being driven, which does not happen in
+            // the editor, so the shot shows the empty glass. It is here to check that the
+            // frame sits where a driver would look for it and does not cover the HUD.
+            Transform mirror = hud.Find("RearMirror");
+
+            if (mirror != null)
+            {
+                mirror.gameObject.SetActive(true);
+
+                var glass = mirror.GetComponentInChildren<RawImage>(true);
+
+                if (glass != null)
+                {
+                    glass.color = new Color(0.16f, 0.17f, 0.19f, 1f);
+                }
+            }
 
             // The bay counter is off until a level says it wants more than one, so the
             // shot has to switch it on to show what it looks like when one does.

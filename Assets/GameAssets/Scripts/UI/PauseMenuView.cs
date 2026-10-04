@@ -20,6 +20,11 @@ namespace CarParkingGame.UI
         [SerializeField] private Button menuButton;
         [SerializeField] private Text modeLabel;
 
+        [Header("Settings, over the paused game")]
+        [SerializeField] private Button settingsButton;
+        [SerializeField] private MenuController menu;
+        [SerializeField] private GameObject menuRoot;
+
         private GameSession Session => session != null ? session : GameSession.Instance;
 
         private void Awake()
@@ -28,6 +33,7 @@ namespace CarParkingGame.UI
             resumeButton?.onClick.AddListener(OnResume);
             restartButton?.onClick.AddListener(OnRestart);
             menuButton?.onClick.AddListener(OnMenu);
+            settingsButton?.onClick.AddListener(OnSettings);
 
             SetPanel(false);
         }
@@ -41,6 +47,11 @@ namespace CarParkingGame.UI
                 active.PauseChanged += OnPauseChanged;
             }
 
+            if (menu != null)
+            {
+                menu.SettingsClosedOverPause += OnSettingsClosed;
+            }
+
             SetPanel(active != null && active.IsPaused);
         }
 
@@ -52,6 +63,40 @@ namespace CarParkingGame.UI
             {
                 active.PauseChanged -= OnPauseChanged;
             }
+
+            if (menu != null)
+            {
+                menu.SettingsClosedOverPause -= OnSettingsClosed;
+            }
+        }
+
+        // The settings screen belongs to the main menu, so this shows the menu's root over
+        // the paused game rather than keeping a second copy of every slider in here. The
+        // session stays in play, so the level is still behind it when the player backs out.
+        private void OnSettings()
+        {
+            if (menu == null || menuRoot == null)
+            {
+                return;
+            }
+
+            SetPanel(false);
+
+            // Switching the root on wakes MenuController, which sends itself home, so the
+            // screen has to be chosen after that and not before.
+            menuRoot.SetActive(true);
+            menu.OpenSettingsOverPause();
+        }
+
+        private void OnSettingsClosed()
+        {
+            if (menuRoot != null)
+            {
+                menuRoot.SetActive(false);
+            }
+
+            GameSession active = Session;
+            SetPanel(active == null || active.IsPaused);
         }
 
         private void OnPauseChanged(bool paused)

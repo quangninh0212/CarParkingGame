@@ -26,6 +26,7 @@ namespace CarParkingGame.EditorTools
         private const string AudioFolder = "Assets/GameAssets/Audio";
         private const string HornClipPath = AudioFolder + "/HornPlaceholder.wav";
         private const string MaterialFolder = "Assets/GameAssets/Materials";
+        private const string ImpactSourceName = "ImpactAudio";
         private const string LampParentName = "PlaceholderLights";
 
         private static readonly Color HeadlightColor = new Color(1f, 0.96f, 0.85f);
@@ -204,20 +205,114 @@ namespace CarParkingGame.EditorTools
             Debug.Log($"[VehicleDressingTool] '{car.name}': 8 lamps placed from its own wheel geometry (track {measurements.halfWidth * 2f:0.00}m, wheelbase {measurements.frontZ - measurements.rearZ:0.00}m), horn wired.", car);
         }
 
-        // Picks the renderers the garage will paint: everything on the car except the
-        // wheels and the lamps we just added.
+        // The material slots the garage will paint.
         //
-        // The car bodies are single meshes, so if a body mesh also covers the windows, the
-        // colour will tint those too. That is a limit of the art, not of the code - narrow
-        // this list by hand in the Inspector if it looks wrong.
+        // This used to collect whole renderers, and the garage then set a colour on each
+        // one. A car body is a single mesh with several materials on it, and a property
+        // block set on the renderer reaches all of them, so choosing red turned the
+        // windscreen, the headlights and the bumpers red as well. A player reported it as
+        // "it paints the whole car and looks terrible", which is exactly what it did.
+        //
+        // The art names its materials honestly - SEDAN_PAINT, K_Body, B_Body against
+        // SEDAN_GLASS, B_Tyre, K_Chrome - so the slot is picked by the material's own
+        // name, and everything the pack calls something else is left alone.
+        private static readonly string[] PaintMaterialWords = { "paint", "body" };
+
+        private static readonly string[] NotPaintMaterialWords =
+        {
+            "glass", "window", "light", "lamp", "bulb", "chrome", "tyre", "tire", "wheel",
+            "rim", "mirror", "plastic", "interior", "grill", "plate", "under", "engine",
+            "trim", "vinyl", "hole", "collider", "exhaust", "lod"
+        };
+
         private static void WirePaintTarget(CarController car, Transform lampRoot)
         {
             WirePaintTargetOn(car.transform, lampRoot);
+            WireCollisionAudio(car);
+        }
+
+        // The noise the car makes when it hits something.
+        //
+        // It listens for collisions itself rather than going through the mission system,
+        // because the reporter the missions attach only exists while a mission is running
+        // - and a car that is silent in free roam sounds broken.
+        private static void WireCollisionAudio(CarController car)
+        {
+            AudioClip soft = AssetDatabase.LoadAssetAtPath<AudioClip>(ImpactSoundGenerator.SoftPath);
+            AudioClip hard = AssetDatabase.LoadAssetAtPath<AudioClip>(ImpactSoundGenerator.HardPath);
+
+            if (soft == null || hard == null)
+            {
+                Debug.LogWarning("[VehicleDressingTool] No impact clips; run Tools > Car Parking > Generate Impact Sounds first.");
+                return;
+            }
+
+            var audio = car.GetComponent<VehicleCollisionAudio>();
+
+            if (audio == null)
+            {
+                audio = car.gameObject.AddComponent<VehicleCollisionAudio>();
+            }
+
+            // Its own source, so an impact never cuts off the engine loop sharing a source
+            // with it.
+            Transform existing = car.transform.Find(ImpactSourceName);
+
+            if (existing != null)
+            {
+                UnityEngine.Object.DestroyImmediate(existing.gameObject);
+            }
+
+            var host = new GameObject(ImpactSourceName);
+            host.transform.SetParent(car.transform, false);
+
+            AudioSource source = host.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.loop = false;
+            source.spatialBlend = 0f;
+            source.volume = 0.9f;
+
+            var serialized = new SerializedObject(audio);
+            SetObject(serialized, "softImpact", soft);
+            SetObject(serialized, "hardImpact", hard);
+            SetObject(serialized, "source", source);
+            serialized.ApplyModifiedProperties();
+
+            EditorUtility.SetDirty(audio);
+        }
+
+        private static bool IsPaintMaterial(Material material)
+        {
+            if (material == null)
+            {
+                return false;
+            }
+
+            string name = material.name;
+
+            foreach (string word in NotPaintMaterialWords)
+            {
+                if (name.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return false;
+                }
+            }
+
+            foreach (string word in PaintMaterialWords)
+            {
+                if (name.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void WirePaintTargetOn(Transform car, Transform lampRoot)
         {
-            var bodyRenderers = new List<Renderer>();
+            var slots = new List<CarPaintTarget.PaintSlot>();
+            var named = new List<string>();
 
             foreach (Renderer renderer in car.GetComponentsInChildren<Renderer>(true))
             {
@@ -226,47 +321,39 @@ namespace CarParkingGame.EditorTools
                     continue;
                 }
 
-                if (renderer.name.IndexOf("wheel", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    continue;
-                }
+                Material[] materials = renderer.sharedMaterials;
 
-                bodyRenderers.Add(renderer);
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    if (!IsPaintMaterial(materials[i]))
+                    {
+                        continue;
+                    }
+
+                    slots.Add(new CarPaintTarget.PaintSlot { renderer = renderer, materialIndex = i });
+                    named.Add(materials[i].name);
+                }
             }
 
-            if (bodyRenderers.Count == 0)
+            if (slots.Count == 0)
             {
-                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' has no paintable renderers.", car);
+                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' has no material called paint or body, so the garage cannot repaint it.", car);
                 return;
             }
 
             CarPaintTarget paint = car.GetComponent<CarPaintTarget>();
-
 
             if (paint == null)
             {
                 paint = car.gameObject.AddComponent<CarPaintTarget>();
             }
 
-            var serialized = new SerializedObject(paint);
-            SerializedProperty array = serialized.FindProperty("bodyRenderers");
+            paint.EditorSetSlots(slots.ToArray());
+            EditorUtility.SetDirty(paint);
 
-            if (array == null)
-            {
-                Debug.LogWarning("[VehicleDressingTool] CarPaintTarget has no 'bodyRenderers' field.");
-                return;
-            }
-
-            array.arraySize = bodyRenderers.Count;
-
-            for (int i = 0; i < bodyRenderers.Count; i++)
-            {
-                array.GetArrayElementAtIndex(i).objectReferenceValue = bodyRenderers[i];
-            }
-
-            serialized.ApplyModifiedProperties();
-
-            Debug.Log($"[VehicleDressingTool] '{car.name}': {bodyRenderers.Count} paintable renderer(s) assigned.", car);
+            // Named in the log, because which materials count as paintwork is a judgement
+            // about someone else's art and is worth being able to read back.
+            Debug.Log($"[VehicleDressingTool] '{car.name}' repaints {slots.Count} slot(s): {string.Join(", ", named)}.", car);
         }
 
         // Where the driver sits and where the look-back camera sits, measured now so the
