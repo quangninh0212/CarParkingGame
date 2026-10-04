@@ -12,6 +12,9 @@ namespace CarParkingGame.Missions
         [SerializeField] private MissionDefinition definition;
         [SerializeField] private Transform startPoint;
         [SerializeField] private ParkingZone parkingZone;
+
+        [Tooltip("The bays after the first, for missions that ask for more than one. The HUD counts them as P x/N and they are parked in this order.")]
+        [SerializeField] private ParkingZone[] extraZones = new ParkingZone[0];
         [SerializeField] private GameObject environmentContainer;
 
         [Tooltip("Optional. When set, leaving this volume fails the mission.")]
@@ -20,6 +23,52 @@ namespace CarParkingGame.Missions
         public MissionDefinition Definition => definition;
         public Transform StartPoint => startPoint;
         public ParkingZone ParkingZone => parkingZone;
+
+        // How many bays this mission asks for, and which one is the nth. Missions authored
+        // before there was more than one bay have no extras and answer 1, so nothing that
+        // reads ParkingZone on its own has to change.
+        public int BayCount
+        {
+            get
+            {
+                int count = parkingZone != null ? 1 : 0;
+
+                for (int i = 0; extraZones != null && i < extraZones.Length; i++)
+                {
+                    if (extraZones[i] != null)
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
+
+        public ParkingZone GetBay(int index)
+        {
+            if (index <= 0)
+            {
+                return parkingZone;
+            }
+
+            int seen = 0;
+
+            for (int i = 0; extraZones != null && i < extraZones.Length; i++)
+            {
+                if (extraZones[i] == null)
+                {
+                    continue;
+                }
+
+                if (++seen == index)
+                {
+                    return extraZones[i];
+                }
+            }
+
+            return parkingZone;
+        }
         public GameObject EnvironmentContainer => environmentContainer;
         public Collider AllowedArea => allowedArea;
 
@@ -55,6 +104,11 @@ namespace CarParkingGame.Missions
             startPoint = missionStartPoint;
             parkingZone = zone;
             environmentContainer = environment;
+        }
+
+        public void EditorAssignExtraBays(ParkingZone[] bays)
+        {
+            extraZones = bays ?? new ParkingZone[0];
         }
 #endif
 

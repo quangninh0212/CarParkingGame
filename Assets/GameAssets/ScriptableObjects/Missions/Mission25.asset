@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Mission25
   m_EditorClassIdentifier: 
   missionId: 25
-  displayName: Down The Ramp
-  description: Follow the ramp to the lower deck and park there.
-  difficulty: 4
+  displayName: Garden Square
+  description: Planting round the fountain, and two spaces past it.
+  difficulty: 3
   parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 600
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Mission30
   m_EditorClassIdentifier: 
   missionId: 30
-  displayName: Final Examination
-  description: Ramp, pillars, parked cars, and a parallel space with nothing to spare.
-  difficulty: 5
-  parkingType: 2
+  displayName: Nose Out
+  description: Two spaces, both arrows pointing back out. Reverse in.
+  difficulty: 4
+  parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 700
+  coinReward: 600
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

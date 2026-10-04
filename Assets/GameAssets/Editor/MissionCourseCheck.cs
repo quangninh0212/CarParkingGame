@@ -95,30 +95,46 @@ namespace CarParkingGame.EditorTools
         private static void CheckMission(MissionAuthoring mission, List<string> problems)
         {
             int id = mission.MissionId;
-            ParkingZone zone = mission.ParkingZone;
             Transform start = mission.StartPoint;
 
-            if (zone == null || start == null)
+            if (mission.ParkingZone == null || start == null)
             {
                 problems.Add($"Mission {id}: missing a parking zone or start point.");
                 return;
             }
 
-            Vector3 bay = zone.WorldCenter;
-            Quaternion bayRotation = Quaternion.LookRotation(zone.ParkedHeading, Vector3.up);
-
             CheckStandable(id, "start point", start.position, start.rotation, problems);
-            CheckStandable(id, "parking bay", bay + Vector3.up * 0.5f, bayRotation, problems);
-
-            // Nothing overhead. A deck built over its own lower level looks right from
-            // above and traps the car underneath it.
             CheckHeadroom(id, "start point", start.position, problems);
-            CheckHeadroom(id, "parking bay", bay, problems);
 
-            // Ground the whole way from the start to the bay. This is a straight line, not
-            // the route - a course with corners will have walls across it - so only a
-            // missing floor is reported, not an obstruction.
-            CheckFloorAlong(id, start.position, bay, problems);
+            // Every bay, not just the first. A level that asks for four of them is only as
+            // playable as its worst one, and a bay with a car already parked in it looks
+            // from above exactly like a bay without.
+            for (int index = 0; index < mission.BayCount; index++)
+            {
+                ParkingZone zone = mission.GetBay(index);
+
+                if (zone == null)
+                {
+                    problems.Add($"Mission {id}: bay {index + 1} is missing.");
+                    continue;
+                }
+
+                string what = mission.BayCount > 1 ? $"parking bay {index + 1}" : "parking bay";
+
+                Vector3 bay = zone.WorldCenter;
+                Quaternion bayRotation = Quaternion.LookRotation(zone.ParkedHeading, Vector3.up);
+
+                CheckStandable(id, what, bay + Vector3.up * 0.5f, bayRotation, problems);
+
+                // Nothing overhead. A deck built over its own lower level looks right from
+                // above and traps the car underneath it.
+                CheckHeadroom(id, what, bay, problems);
+
+                // Ground the whole way from the start to the bay. This is a straight line,
+                // not the route - a course with corners will have walls across it - so
+                // only a missing floor is reported, not an obstruction.
+                CheckFloorAlong(id, start.position, bay, problems);
+            }
 
             // And, where the course recorded the lane it wants driven, that a car actually
             // fits down it.

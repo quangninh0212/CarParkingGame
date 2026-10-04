@@ -26,9 +26,13 @@ namespace CarParkingGame.Parking
                  "(a nose-in bay whose end marker faces out of the bay).")]
         [SerializeField] private bool parkedFacingBackward;
 
+        [Tooltip("Off for a bay that takes the car either way round. The bay is then painted without an arrow, which is how the player is told.")]
+        [SerializeField] private bool requireHeading = true;
+
         public Vector3 Size => size;
         public Vector3 WorldCenter => transform.position + transform.rotation * center;
         public Vector3 ParkedHeading => parkedFacingBackward ? -transform.forward : transform.forward;
+        public bool RequireHeading => requireHeading;
 
         // Height is deliberately ignored: bays sit on kerbs, ramps and garage floors
         // at slightly different heights, and a vertical test only adds false negatives.
@@ -88,6 +92,11 @@ namespace CarParkingGame.Parking
         {
             center = boxCenter;
             size = boxSize;
+        }
+
+        public void EditorSetRequireHeading(bool required)
+        {
+            requireHeading = required;
         }
 
         public void EditorSetParkedFacingBackward(bool facingBackward)

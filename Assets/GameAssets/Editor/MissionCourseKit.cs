@@ -107,6 +107,7 @@ namespace CarParkingGame.EditorTools
 
         private static readonly Color Yellow = new Color(1f, 0.82f, 0.15f);
         private static readonly Color White = new Color(0.93f, 0.95f, 0.98f);
+        private static readonly Color Hedge = new Color(0.28f, 0.52f, 0.26f);
 
         public GameObject Spawn(Part part, Transform parent, Vector3 localPosition, float yawDegrees, Vector3 size)
         {
@@ -200,19 +201,38 @@ namespace CarParkingGame.EditorTools
         // heading check with nothing on screen to say why.
         public void PaintBay(Transform bay, float width, float length)
         {
+            PaintBay(bay, width, length, true, true);
+        }
+
+        // A bay as the player reads it. The colour says whether this is one to aim for,
+        // and the arrow - or the lack of one - says whether it has to be entered a
+        // particular way round.
+        //
+        // No arrow means no heading check, and those two have to be decided together: an
+        // arrow the validator ignores, or a heading check with nothing on the ground to
+        // say which way, are both just a mission the player cannot read.
+        public void PaintBay(Transform bay, float width, float length, bool target, bool withArrow)
+        {
             const float Paint = 0.32f;
+
+            Color colour = target ? Yellow : White;
 
             float halfWidth = width * 0.5f;
             float halfLength = length * 0.5f;
 
-            PaintStroke(bay, new Vector3(-halfWidth, PaintLift, 0f), 0f, new Vector3(Paint, PaintThickness, length));
-            PaintStroke(bay, new Vector3(halfWidth, PaintLift, 0f), 0f, new Vector3(Paint, PaintThickness, length));
-            PaintStroke(bay, new Vector3(0f, PaintLift, halfLength), 0f, new Vector3(width, PaintThickness, Paint));
-            PaintStroke(bay, new Vector3(0f, PaintLift, -halfLength), 0f, new Vector3(width, PaintThickness, Paint));
+            PaintStroke(bay, new Vector3(-halfWidth, PaintLift, 0f), 0f, new Vector3(Paint, PaintThickness, length), colour);
+            PaintStroke(bay, new Vector3(halfWidth, PaintLift, 0f), 0f, new Vector3(Paint, PaintThickness, length), colour);
+            PaintStroke(bay, new Vector3(0f, PaintLift, halfLength), 0f, new Vector3(width, PaintThickness, Paint), colour);
+            PaintStroke(bay, new Vector3(0f, PaintLift, -halfLength), 0f, new Vector3(width, PaintThickness, Paint), colour);
+
+            if (!withArrow)
+            {
+                return;
+            }
 
             // The arrow sits well inside the rectangle, so its tip does not run into the
             // painted end of the bay.
-            PaintArrowHead(bay, length * 0.64f, width * 0.5f, 0.55f, Yellow);
+            PaintArrowHead(bay, length * 0.64f, width * 0.5f, 0.55f, colour);
         }
 
         // A lane arrow painted on the road, pointing along the parent's +Z: the same flat

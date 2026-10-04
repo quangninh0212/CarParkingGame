@@ -109,7 +109,7 @@ namespace CarParkingGame.EditorTools
 
             foreach (Plot plot in plots)
             {
-                MissionDefinition definition = catalog.Find(plot.course.missionId);
+                MissionDefinition definition = GetOrCreateDefinition(catalog, plot.course.missionId);
 
                 if (definition == null)
                 {
@@ -122,8 +122,66 @@ namespace CarParkingGame.EditorTools
                 built++;
             }
 
+            RebuildCatalog(catalog);
+
             Debug.Log($"[MissionCourseBuilder] Built {built} of {MissionCourseLibrary.All.Count} courses on a {used.size.x:0}x{used.size.z:0}m site at {used.center:0}.");
             return built > 0;
+        }
+
+        private const string DefinitionFolder = "Assets/GameAssets/ScriptableObjects/Missions";
+
+        // A level the library has added since the last build has no definition asset yet,
+        // so one is made for it. ApplyDefinition fills it in straight afterwards; this only
+        // has to exist and be findable.
+        private static MissionDefinition GetOrCreateDefinition(MissionCatalog catalog, int missionId)
+        {
+            MissionDefinition definition = catalog.Find(missionId);
+
+            if (definition != null)
+            {
+                return definition;
+            }
+
+            string path = $"{DefinitionFolder}/Mission{missionId:00}.asset";
+            definition = AssetDatabase.LoadAssetAtPath<MissionDefinition>(path);
+
+            if (definition != null)
+            {
+                return definition;
+            }
+
+            definition = ScriptableObject.CreateInstance<MissionDefinition>();
+            AssetDatabase.CreateAsset(definition, path);
+
+            Debug.Log($"[MissionCourseBuilder] Mission {missionId} is new; wrote '{path}'.");
+            return definition;
+        }
+
+        // Every definition on disk, in mission order. The catalog is what the practice
+        // screen lists, so a level that is not in it cannot be chosen however well it
+        // builds - and the order it is in is the order the levels are played.
+        private static void RebuildCatalog(MissionCatalog catalog)
+        {
+            var found = new List<MissionDefinition>();
+
+            foreach (string guid in AssetDatabase.FindAssets("t:MissionDefinition", new[] { DefinitionFolder }))
+            {
+                var definition = AssetDatabase.LoadAssetAtPath<MissionDefinition>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+
+                if (definition != null)
+                {
+                    found.Add(definition);
+                }
+            }
+
+            found.Sort((a, b) => a.MissionId.CompareTo(b.MissionId));
+
+            catalog.EditorSetMissions(found);
+            EditorUtility.SetDirty(catalog);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"[MissionCourseBuilder] Catalog lists {found.Count} missions.");
         }
 
         private readonly struct Plot
@@ -542,7 +600,15 @@ namespace CarParkingGame.EditorTools
 
             // After the layout, so the entrance gap can be put where the course's own
             // start point is rather than guessed at.
-            if (course.singleDeck)
+            if (course.singleDeck && course.arena)
+            {
+                // A car park, not a road: walled the whole way round in red and white so it
+                // reads as the edge of the lot rather than as a building. Low enough to see
+                // the whole lot over from the driving camera, high enough that the car stops
+                // against it instead of riding up and out.
+                writer.StripedRail(course.width, course.length);
+            }
+            else if (course.singleDeck)
             {
                 float entranceX = writer.StartPoint != null ? writer.StartPoint.localPosition.x : 0f;
                 writer.Rail(0f, course.length * 0.5f, course.width, course.length, 12f, entranceX);
@@ -558,12 +624,22 @@ namespace CarParkingGame.EditorTools
             Transform startPoint = writer.StartPoint != null ? writer.StartPoint : writer.DefaultStart();
 
             var authoring = root.AddComponent<MissionAuthoring>();
-            authoring.EditorAssign(definition, startPoint, writer.Zone, root);
+            authoring.EditorAssign(definition, startPoint, writer.Zones[0], root);
+
+            // Bays after the first, in the order the layout painted them.
+            var extras = new ParkingZone[writer.Zones.Count - 1];
+
+            for (int i = 1; i < writer.Zones.Count; i++)
+            {
+                extras[i - 1] = writer.Zones[i];
+            }
+
+            authoring.EditorAssignExtraBays(extras);
             EditorUtility.SetDirty(authoring);
 
             root.SetActive(false);
 
-            Debug.Log($"[MissionCourseBuilder] Mission {course.missionId} '{course.name}' ({course.width:0}x{course.length:0}m, {definition.ParkingType}) at {position:0.0} yaw {yaw:0}.", root);
+            Debug.Log($"[MissionCourseBuilder] Mission {course.missionId} '{course.name}' ({course.width:0}x{course.length:0}m, {definition.ParkingType}, {writer.Zones.Count} bay(s)) at {position:0.0} yaw {yaw:0}.", root);
         }
 
         // The thing each course's layout method writes into. Everything is in course-local
@@ -586,8 +662,32 @@ namespace CarParkingGame.EditorTools
 
             private float level;
             private int routes;
+            private int parked;
+            private int stripes;
 
-            public ParkingZone Zone { get; private set; }
+            // What a BayRow plan is written out of.
+            private const char EmptyBay = '.';
+            private const char BayWithCar = '#';
+            private const char TargetWithArrow = 'T';
+            private const char TargetAnyWayRound = 't';
+            private const char NoBay = ' ';
+
+            private const float BayWidth = 3.3f;
+            private const float BayLength = 6.4f;
+
+            private static readonly MissionCourseKit.CarModel[] CarCycle =
+            {
+                MissionCourseKit.CarModel.Sedan,
+                MissionCourseKit.CarModel.Hatchback,
+                MissionCourseKit.CarModel.Muscle,
+                MissionCourseKit.CarModel.Classic,
+                MissionCourseKit.CarModel.HotRod
+            };
+
+            private readonly List<ParkingZone> zones = new List<ParkingZone>();
+
+            public ParkingZone Zone => zones.Count > 0 ? zones[0] : null;
+            public IReadOnlyList<ParkingZone> Zones => zones;
             public Transform StartPoint { get; private set; }
             public MissionCourseKit Kit => kit;
             public Transform Root => root;
@@ -621,22 +721,22 @@ namespace CarParkingGame.EditorTools
             // Every course stands on a raised slab; before this, running wide at the edge
             // dropped the car off the world. The entrance gap is only left on the deck the
             // course starts on.
-            public void Rail(float x, float z, float width, float length, float entranceGap = 0f, float entranceCentreX = 0f)
+            public void Rail(float x, float z, float width, float length, float entranceGap = 0f,
+                float entranceCentreX = 0f, float height = 1.6f,
+                MissionCourseKit.Part part = MissionCourseKit.Part.Concrete)
             {
-                const float Height = 1.6f;
-
                 float left = x - width * 0.5f;
                 float right = x + width * 0.5f;
                 float near = z - length * 0.5f;
                 float far = z + length * 0.5f;
 
-                kit.Wall(root, new Vector2(left, near), new Vector2(left, far), Height, 0.5f);
-                kit.Wall(root, new Vector2(right, near), new Vector2(right, far), Height, 0.5f);
-                kit.Wall(root, new Vector2(left, far), new Vector2(right, far), Height, 0.5f);
+                kit.Wall(root, new Vector2(left, near), new Vector2(left, far), height, 0.5f, part);
+                kit.Wall(root, new Vector2(right, near), new Vector2(right, far), height, 0.5f, part);
+                kit.Wall(root, new Vector2(left, far), new Vector2(right, far), height, 0.5f, part);
 
                 if (entranceGap <= 0f)
                 {
-                    kit.Wall(root, new Vector2(left, near), new Vector2(right, near), Height, 0.5f);
+                    kit.Wall(root, new Vector2(left, near), new Vector2(right, near), height, 0.5f, part);
                     return;
                 }
 
@@ -645,8 +745,56 @@ namespace CarParkingGame.EditorTools
                 float gapLeft = Mathf.Clamp(entranceCentreX - entranceGap * 0.5f, left, right);
                 float gapRight = Mathf.Clamp(entranceCentreX + entranceGap * 0.5f, left, right);
 
-                kit.Wall(root, new Vector2(left, near), new Vector2(gapLeft, near), Height, 0.5f);
-                kit.Wall(root, new Vector2(gapRight, near), new Vector2(right, near), Height, 0.5f);
+                kit.Wall(root, new Vector2(left, near), new Vector2(gapLeft, near), height, 0.5f, part);
+                kit.Wall(root, new Vector2(gapRight, near), new Vector2(right, near), height, 0.5f, part);
+            }
+
+            // The wall round a lot, laid as alternating red and white blocks instead of as
+            // one long one.
+            //
+            // The striped barrier prefab is a single short section. Scaling one of them to
+            // thirty-four metres stretches its stripes with it, and from the driving seat
+            // the whole thing read as a plain grey kerb. Blocks keep their stripes the size
+            // they were drawn, because each one is a stripe.
+            public void StripedRail(float width, float length, float height = 1.15f)
+            {
+                const float Segment = 3f;
+                const float Thickness = 0.5f;
+
+                float x = width * 0.5f;
+
+                Side(-x, 0f, x, 0f);
+                Side(-x, length, x, length);
+                Side(-x, 0f, -x, length);
+                Side(x, 0f, x, length);
+
+                void Side(float x1, float z1, float x2, float z2)
+                {
+                    var from = new Vector2(x1, z1);
+                    var to = new Vector2(x2, z2);
+
+                    float run = (to - from).magnitude;
+                    int count = Mathf.Max(1, Mathf.RoundToInt(run / Segment));
+                    float each = run / count;
+
+                    Vector2 step = (to - from) / count;
+                    float yaw = Mathf.Atan2(step.x, step.y) * Mathf.Rad2Deg;
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        Vector2 centre = from + step * (i + 0.5f);
+
+                        GameObject block = kit.Spawn(MissionCourseKit.Part.Concrete, root,
+                            new Vector3(centre.x, level + height * 0.5f, centre.y), yaw,
+                            new Vector3(Thickness, height, each));
+
+                        bool red = (stripes++ & 1) == 0;
+
+                        MissionCourseKit.Tint(block,
+                            red ? "CourseRailRed" : "CourseRailWhite",
+                            red ? new Color(0.76f, 0.19f, 0.17f) : new Color(0.93f, 0.92f, 0.89f));
+                    }
+                }
             }
 
             public void PadAt(float x, float z, float width, float length, float thickness = 0.5f)
@@ -734,6 +882,153 @@ namespace CarParkingGame.EditorTools
                 kit.Spawn(part, root, new Vector3(x, level + height * 0.5f, z), yaw, new Vector3(width, height, depth));
             }
 
+            // A run of bays side by side, written as a picture of the row:
+            //
+            //   .  an empty bay, painted white
+            //   #  a bay with a car already in it
+            //   T  a bay to park in, nose the way the painted arrow points
+            //   t  a bay to park in, either way round - painted without an arrow
+            //      a space leaves a gap, with no bay painted at all
+            //
+            // The row runs along +X from x, every bay facing yaw.
+            public void BayRow(float x, float z, float yaw, string plan, float spacing = 3.45f)
+            {
+                PlaceBays(x, z, spacing, 0f, yaw, plan);
+            }
+
+            // The same row turned ninety degrees: bays stacked up the lot rather than
+            // across it, which is how the long walls of a narrow lot are lined.
+            public void BayColumn(float x, float z, float yaw, string plan, float spacing = 3.45f)
+            {
+                PlaceBays(x, z, 0f, spacing, yaw, plan);
+            }
+
+            // Bays set round a circle, each one square on to the middle of it. Reads as a
+            // ring of parking round a fountain, which a grid cannot do.
+            public void BayRing(float centreX, float centreZ, float radius, string plan, bool noseIn = true)
+            {
+                if (string.IsNullOrEmpty(plan))
+                {
+                    return;
+                }
+
+                for (int i = 0; i < plan.Length; i++)
+                {
+                    float angle = i * 360f / plan.Length;
+                    float radians = angle * Mathf.Deg2Rad;
+
+                    float x = centreX + Mathf.Sin(radians) * radius;
+                    float z = centreZ + Mathf.Cos(radians) * radius;
+
+                    // Pointing at the middle, or out of it.
+                    float yaw = noseIn ? angle + 180f : angle;
+
+                    PlaceBay(plan[i], x, z, yaw);
+                }
+            }
+
+            private void PlaceBays(float x, float z, float stepX, float stepZ, float yaw, string plan)
+            {
+                if (string.IsNullOrEmpty(plan))
+                {
+                    return;
+                }
+
+                for (int i = 0; i < plan.Length; i++)
+                {
+                    PlaceBay(plan[i], x + i * stepX, z + i * stepZ, yaw);
+                }
+            }
+
+            private void PlaceBay(char what, float x, float z, float yaw)
+            {
+                switch (what)
+                {
+                    case TargetWithArrow:
+                        Bay(x, z, yaw, true, BayWidth, BayLength);
+                        break;
+
+                    case TargetAnyWayRound:
+                        Bay(x, z, yaw, false, BayWidth, BayLength);
+                        break;
+
+                    case BayWithCar:
+                        MarkBay(x, z, yaw);
+                        Car(x, z, yaw, NextCar());
+                        break;
+
+                    case EmptyBay:
+                        MarkBay(x, z, yaw);
+                        break;
+
+                    case NoBay:
+                        break;
+
+                    default:
+                        Debug.LogWarning($"[MissionCourseBuilder] Mission {course.missionId}: {what} is not a bay.");
+                        break;
+                }
+            }
+
+            // White paint and nothing else: a bay that is part of the lot but not part of
+            // the task.
+            public void MarkBay(float x, float z, float yaw, float width = BayWidth, float length = BayLength)
+            {
+                var marking = new GameObject("BayMarking");
+                marking.transform.SetParent(root, false);
+                marking.transform.localPosition = new Vector3(x, level, z);
+                marking.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+                kit.PaintBay(marking.transform, width, length, false, false);
+            }
+
+            // The centrepiece a lot is laid out around: a low hexagonal basin with water in
+            // it. Built from three crossed boxes, because the project has no round mesh and
+            // three boxes at sixty degrees read as a hexagon from the driving camera.
+            public void Fountain(float x, float z, float radius)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float yaw = i * 60f;
+
+                    GameObject wall = kit.Spawn(MissionCourseKit.Part.Concrete, root,
+                        new Vector3(x, level + 0.3f, z), yaw, new Vector3(radius * 2f, 0.6f, radius * 1.16f));
+
+                    MissionCourseKit.Tint(wall, "CourseFountainStone", new Color(0.62f, 0.58f, 0.52f));
+
+                    // The water, sat just below the rim.
+                    GameObject water = kit.Spawn(MissionCourseKit.Part.Plate, root,
+                        new Vector3(x, level + 0.52f, z), yaw,
+                        new Vector3(radius * 1.6f, 0.06f, radius * 0.93f));
+
+                    MissionCourseKit.Tint(water, "CourseFountainWater", new Color(0.25f, 0.52f, 0.78f), true);
+                }
+            }
+
+            // A line of the white pedestrian barriers, which is what a lot uses to close
+            // off a section rather than a wall.
+            public void WhiteBarriers(float x1, float z1, float x2, float z2, int count)
+            {
+                kit.BarrierLine(root, new Vector2(x1, z1), new Vector2(x2, z2), count,
+                    MissionCourseKit.Part.PedestrianBarrier);
+            }
+
+            // Planting, as a low green block. The project has no hedge model, and a run of
+            // these reads as one from the car.
+            public void Hedge(float x, float z, float yaw, float length)
+            {
+                GameObject hedge = kit.Spawn(MissionCourseKit.Part.Concrete, root,
+                    new Vector3(x, level + 0.45f, z), yaw, new Vector3(1.1f, 0.9f, length));
+
+                MissionCourseKit.Tint(hedge, "CourseHedge", new Color(0.28f, 0.52f, 0.26f));
+            }
+
+            // Walks the car models, so a full row is not ten of the same car.
+            private MissionCourseKit.CarModel NextCar()
+            {
+                return CarCycle[parked++ % CarCycle.Length];
+            }
+
             public void Arrow(float x, float z, float yaw)
             {
                 kit.PaintArrow(root, new Vector3(x, level, z), yaw);
@@ -786,7 +1081,21 @@ namespace CarParkingGame.EditorTools
             // the validator measures against.
             public void Bay(float x, float z, float yaw, float width = 3.2f, float length = 6.5f)
             {
-                var bayObject = new GameObject("ParkingBay");
+                Bay(x, z, yaw, true, width, length);
+            }
+
+            // A bay the player has to fill. Painted yellow, and with an arrow only when it
+            // has to be entered a particular way round: the paint and the heading check
+            // come from the same flag so they cannot disagree. An arrow the validator
+            // ignores, or a heading check with nothing on the ground to say which way, are
+            // each just a level the player cannot read.
+            //
+            // Bays are filled in the order they are written, and that order is what the
+            // P 1/3 counter counts.
+            public void Bay(float x, float z, float yaw, bool requireHeading,
+                float width = 3.2f, float length = 6.5f)
+            {
+                var bayObject = new GameObject("ParkingBay " + (zones.Count + 1));
                 bayObject.transform.SetParent(root, false);
                 bayObject.transform.localPosition = new Vector3(x, level, z);
                 bayObject.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
@@ -794,10 +1103,11 @@ namespace CarParkingGame.EditorTools
                 var zone = bayObject.AddComponent<ParkingZone>();
                 zone.EditorSetBox(Vector3.zero, new Vector3(width, 2.5f, length));
                 zone.EditorSetParkedFacingBackward(false);
+                zone.EditorSetRequireHeading(requireHeading);
 
-                kit.PaintBay(bayObject.transform, width, length);
+                kit.PaintBay(bayObject.transform, width, length, true, requireHeading);
 
-                Zone = zone;
+                zones.Add(zone);
             }
         }
     }

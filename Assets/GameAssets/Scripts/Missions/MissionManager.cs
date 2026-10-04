@@ -31,6 +31,11 @@ namespace CarParkingGame.Missions
         private MissionLaunchOptions activeOptions;
         private MissionScoreTracker tracker;
         private ParkingValidator validator;
+
+        // Which bay of a multi-bay mission is being asked for. Everything else about the
+        // mission - the clock, the score, the collisions - carries straight across the
+        // bays; only the target moves.
+        private int bayIndex;
         private VehicleCollisionReporter reporter;
         private CarController vehicle;
         private bool running;
@@ -41,9 +46,15 @@ namespace CarParkingGame.Missions
         public event Action<float> ParkingProgressChanged;
         public event Action<ParkingState> ParkingStateChanged;
 
+        // Bays filled, bays wanted. Raised when a mission starts and after each bay, so
+        // the HUD can show P 1/3 without polling.
+        public event Action<int, int> BayProgressChanged;
+
         public bool IsRunning => running;
         public MissionDefinition ActiveMission => activeMission != null ? activeMission.Definition : null;
-        public ParkingZone ActiveZone => activeMission != null ? activeMission.ParkingZone : null;
+        public ParkingZone ActiveZone => activeMission != null ? activeMission.GetBay(bayIndex) : null;
+        public int BaysFilled => bayIndex;
+        public int BayCount => activeMission != null ? activeMission.BayCount : 0;
         public ParkingValidator ActiveValidator => validator;
         public MissionScoreTracker Tracker => tracker;
         public IReadOnlyList<MissionAuthoring> RegisteredMissions => registeredMissions;
@@ -117,7 +128,7 @@ namespace CarParkingGame.Missions
                 return;
             }
 
-            ParkingZone zone = activeMission.ParkingZone;
+            ParkingZone zone = ActiveZone;
 
             Vector3 heading = zone.ParkedHeading;
             heading.y = 0f;
@@ -343,7 +354,19 @@ namespace CarParkingGame.Missions
 
         private void SetUpValidator(MissionAuthoring mission, MissionDefinition definition)
         {
-            ParkingZone zone = mission.ParkingZone;
+            bayIndex = 0;
+            AimAtBay(mission, definition);
+            BayProgressChanged?.Invoke(bayIndex, mission.BayCount);
+        }
+
+        // Points the validator at the bay being asked for now. The validator lives on the
+        // bay rather than on the car, so moving to the next bay means letting go of one
+        // component and taking hold of another.
+        private void AimAtBay(MissionAuthoring mission, MissionDefinition definition)
+        {
+            ReleaseValidator();
+
+            ParkingZone zone = mission.GetBay(bayIndex);
 
             validator = zone.GetComponent<ParkingValidator>();
 
@@ -382,6 +405,20 @@ namespace CarParkingGame.Missions
             reporter.Collided += OnVehicleCollided;
         }
 
+        private void ReleaseValidator()
+        {
+            if (validator == null)
+            {
+                return;
+            }
+
+            validator.StateChanged -= OnParkingStateChanged;
+            validator.ProgressChanged -= OnParkingProgressChanged;
+            validator.Validated -= OnParkingValidated;
+            validator.Stop();
+            validator = null;
+        }
+
         private void PlaceVehicleAtStart(Transform startPoint)
         {
             var body = vehicle.GetComponent<Rigidbody>();
@@ -414,6 +451,19 @@ namespace CarParkingGame.Missions
         {
             if (!running)
             {
+                return;
+            }
+
+            bayIndex++;
+
+            int wanted = activeMission.BayCount;
+            BayProgressChanged?.Invoke(bayIndex, wanted);
+
+            if (bayIndex < wanted)
+            {
+                // More to do: same mission, same clock, same score - the target moves and
+                // the car drives on to it.
+                AimAtBay(activeMission, activeMission.Definition);
                 return;
             }
 
@@ -503,14 +553,8 @@ namespace CarParkingGame.Missions
 
         private void StopActiveMission()
         {
-            if (validator != null)
-            {
-                validator.StateChanged -= OnParkingStateChanged;
-                validator.ProgressChanged -= OnParkingProgressChanged;
-                validator.Validated -= OnParkingValidated;
-                validator.Stop();
-                validator = null;
-            }
+            ReleaseValidator();
+            bayIndex = 0;
 
             if (reporter != null)
             {

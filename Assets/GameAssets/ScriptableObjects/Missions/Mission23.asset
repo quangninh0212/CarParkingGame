@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Mission23
   m_EditorClassIdentifier: 
   missionId: 23
-  displayName: Car Park Deck
-  description: Wide lanes between the pillars and a bay near the entrance.
+  displayName: The Circus
+  description: Eight bays round a fountain. Not one of them is square on.
   difficulty: 3
   parkingType: 0
   timeLimitSeconds: 0

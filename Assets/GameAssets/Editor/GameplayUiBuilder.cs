@@ -248,6 +248,7 @@ namespace CarParkingGame.EditorTools
             Stretch(hud);
 
             BuildHudReadouts(hud, out Text missionName, out Text score, out Text coins, out Text timer, out GameObject timerChip);
+            BuildBayCounter(hud, out Text bayCount, out GameObject bayChip);
             BuildSpeedometer(hud);
             BuildParkingFeedback(hud, out Image indicator, out Image progress, out Text hint);
             BuildGuideArrow(hud);
@@ -259,6 +260,8 @@ namespace CarParkingGame.EditorTools
             SetPrivate(hudView, "coinLabel", coins);
             SetPrivate(hudView, "timerLabel", timer);
             SetPrivate(hudView, "timerContainer", timerChip);
+            SetPrivate(hudView, "bayCountLabel", bayCount);
+            SetPrivate(hudView, "bayCountContainer", bayChip);
             SetPrivate(hudView, "parkingStateIndicator", indicator);
             SetPrivate(hudView, "parkingProgressBar", progress);
             SetPrivate(hudView, "parkingHintLabel", hint);
@@ -302,6 +305,23 @@ namespace CarParkingGame.EditorTools
 
             timer = CreateLabel(timerChip.transform, "Timer", "0:00", 32, TextAnchor.MiddleLeft);
             SetRect(timer.rectTransform, new Vector2(0f, 0.5f), new Vector2(66f, 0f), new Vector2(140f, 40f), new Vector2(0f, 0.5f));
+        }
+
+        // The P 0/3 counter, for the courses that ask for more than one bay. Top right,
+        // beside the speedometer, which is where a player looks for "how much is left".
+        private static void BuildBayCounter(GameObject hud, out Text label, out GameObject chip)
+        {
+            chip = CreatePanel(hud.transform, "BayChip", new Vector2(1f, 1f), new Vector2(-372f, -90f), new Vector2(188f, 76f), HudGlass);
+
+            Text badge = CreateLabel(chip.transform, "Badge", "P", 40, TextAnchor.MiddleCenter);
+            badge.color = new Color(0.55f, 0.78f, 1f, 1f);
+            SetRect(badge.rectTransform, new Vector2(0f, 0.5f), new Vector2(42f, 0f), new Vector2(44f, 48f), new Vector2(0.5f, 0.5f));
+
+            label = CreateLabel(chip.transform, "BayCount", "0/1", 36, TextAnchor.MiddleLeft);
+            SetRect(label.rectTransform, new Vector2(0f, 0.5f), new Vector2(76f, 0f), new Vector2(110f, 44f), new Vector2(0f, 0.5f));
+
+            // Off until a mission says otherwise, so a one-bay course never shows it.
+            chip.SetActive(false);
         }
 
         private static void BuildSpeedometer(GameObject hud)

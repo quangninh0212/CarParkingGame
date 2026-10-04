@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Mission09
   m_EditorClassIdentifier: 
   missionId: 9
-  displayName: Cone Slalom
-  description: Weave the cones, then park straight at the end.
-  difficulty: 2
+  displayName: Open Lot
+  description: An empty lot and one space. Either way round will do.
+  difficulty: 1
   parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 400
+  coinReward: 300
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

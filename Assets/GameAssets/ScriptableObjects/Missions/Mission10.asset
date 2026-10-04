@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Mission10
   m_EditorClassIdentifier: 
   missionId: 10
-  displayName: The L Bend
-  description: A walled training lane with one square corner, and a bay around it.
-  difficulty: 2
+  displayName: First Row
+  description: One space in the near row, with an arrow saying which way in.
+  difficulty: 1
   parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 400
+  coinReward: 300
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

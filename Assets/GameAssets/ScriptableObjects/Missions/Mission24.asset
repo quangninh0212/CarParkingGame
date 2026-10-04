@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Mission24
   m_EditorClassIdentifier: 
   missionId: 24
-  displayName: Pillars And Posts
-  description: The same deck with half the room and a slot on the back wall.
-  difficulty: 5
-  parkingType: 1
+  displayName: Tight Fit
+  description: The lot is full but for one space, and it is not a wide one.
+  difficulty: 3
+  parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 700
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

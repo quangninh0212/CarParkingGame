@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Mission19
   m_EditorClassIdentifier: 
   missionId: 19
-  displayName: Bus Station
-  description: Reverse into the gap between two coaches.
-  difficulty: 4
-  parkingType: 1
+  displayName: Both Walls
+  description: Two spaces down the alley, one on each side.
+  difficulty: 3
+  parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 600
+  coinReward: 500
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

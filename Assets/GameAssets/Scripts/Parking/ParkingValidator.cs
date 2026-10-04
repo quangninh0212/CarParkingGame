@@ -170,7 +170,9 @@ namespace CarParkingGame.Parking
             }
 
             bool inside = LastContainment >= requiredContainment - 0.001f;
-            bool aligned = LastHeadingError <= angleToleranceDegrees;
+            // A bay with no arrow painted in it takes the car whichever way round it ends
+            // up, so there is nothing to be aligned with.
+            bool aligned = !zone.RequireHeading || LastHeadingError <= angleToleranceDegrees;
             bool stopped = LastSpeedKmh <= maxSpeedKmh;
             bool enteredCorrectly = parkingType != ParkingType.Reverse || reversedIntoZone;
 

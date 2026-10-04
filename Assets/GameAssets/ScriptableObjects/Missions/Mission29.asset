@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Mission29
   m_EditorClassIdentifier: 
   missionId: 29
-  displayName: The Maze
-  description: Dead ends and shortcuts between you and the last free space.
-  difficulty: 5
+  displayName: Round The Walls
+  description: Three spaces, one on each of three walls.
+  difficulty: 4
   parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 700
+  coinReward: 600
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

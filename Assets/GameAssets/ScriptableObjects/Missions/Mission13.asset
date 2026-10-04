@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Mission13
   m_EditorClassIdentifier: 
   missionId: 13
-  displayName: Tight Corners
-  description: A service road with two square corners and concrete on both sides.
-  difficulty: 3
+  displayName: The Yard
+  description: Bays round all four walls, and one of them is yours.
+  difficulty: 2
   parkingType: 0
   timeLimitSeconds: 0
   failOnTimeout: 1
@@ -24,5 +24,5 @@ MonoBehaviour:
   holdSeconds: 1.5
   requiredContainment: 0.9
   allowOppositeHeading: 0
-  coinReward: 500
+  coinReward: 400
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

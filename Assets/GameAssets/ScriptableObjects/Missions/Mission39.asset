@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48b2504a234a0cc47a5394e95387023b, type: 3}
+  m_Name: Mission39
+  m_EditorClassIdentifier: 
+  missionId: 39
+  displayName: The Gauntlet
+  description: Cones, barrels and barricades, and three spaces behind them.
+  difficulty: 5
+  parkingType: 0
+  timeLimitSeconds: 0
+  failOnTimeout: 1
+  maxParkingSpeedKmh: 2
+  angleToleranceDegrees: 20
+  holdSeconds: 1.5
+  requiredContainment: 0.9
+  allowOppositeHeading: 0
+  coinReward: 700
+  scoreRules: {fileID: 0}

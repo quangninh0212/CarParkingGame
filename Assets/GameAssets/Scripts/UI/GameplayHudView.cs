@@ -18,6 +18,10 @@ namespace CarParkingGame.UI
         [SerializeField] private Text timerLabel;
         [SerializeField] private GameObject timerContainer;
 
+        [Tooltip("Bays filled out of bays wanted, shown as P 1/3. Hidden on a mission that only asks for one.")]
+        [SerializeField] private Text bayCountLabel;
+        [SerializeField] private GameObject bayCountContainer;
+
         [Header("Parking feedback")]
         [SerializeField] private Image parkingStateIndicator;
         [SerializeField] private Image parkingProgressBar;
@@ -43,6 +47,7 @@ namespace CarParkingGame.UI
                 missions.ScoreChanged += OnScoreChanged;
                 missions.ParkingStateChanged += OnParkingStateChanged;
                 missions.ParkingProgressChanged += OnParkingProgressChanged;
+                missions.BayProgressChanged += OnBayProgressChanged;
             }
 
             RefreshCoins();
@@ -72,6 +77,7 @@ namespace CarParkingGame.UI
             missions.ScoreChanged -= OnScoreChanged;
             missions.ParkingStateChanged -= OnParkingStateChanged;
             missions.ParkingProgressChanged -= OnParkingProgressChanged;
+            missions.BayProgressChanged -= OnBayProgressChanged;
         }
 
         private void Update()
@@ -133,6 +139,26 @@ namespace CarParkingGame.UI
 
             OnScoreChanged(Missions != null && Missions.Tracker != null ? Missions.Tracker.Score : 0);
             SetParkingFeedback(ParkingState.Outside, 0f);
+
+            if (missions != null)
+            {
+                OnBayProgressChanged(missions.BaysFilled, missions.BayCount);
+            }
+        }
+
+        // Shown only when there is more than one bay to fill. On a one-bay mission the
+        // counter would read P 0/1 for the whole level and never say anything.
+        private void OnBayProgressChanged(int filled, int wanted)
+        {
+            if (bayCountContainer != null)
+            {
+                bayCountContainer.SetActive(wanted > 1);
+            }
+
+            if (bayCountLabel != null)
+            {
+                bayCountLabel.text = $"{filled}/{Mathf.Max(1, wanted)}";
+            }
         }
 
         private void OnMissionEnded(MissionResult result)

@@ -8,21 +8,24 @@ using Car = CarParkingGame.EditorTools.MissionCourseKit.CarModel;
 
 namespace CarParkingGame.EditorTools
 {
-    // The designs for missions 9-30, one method each.
+    // The designs for missions 9 upwards, one method each.
     //
-    // Everything is written in the course's own space: the car starts at (0, 0) facing
-    // +Z, the pad runs from z = 0 to z = length and from x = -width/2 to +width/2. That
-    // makes a layout read as a drawing, and it means a course can be moved anywhere on the
-    // map without a single coordinate changing.
+    // Every one of them is a car park: one walled lot, taken in whole from the driving
+    // camera, with the car starting inside it. What changes level to level is the shape of
+    // the lot, which bays are free, what is in the way, and how many bays have to be
+    // filled before the level is done.
     //
-    // The project has no models for buses, fuel pumps, forklifts, shipping containers or
-    // shopping trolley shelters, so those are built out of sized concrete blocks. The
-    // driving problem each level poses - the gaps, the corners, the sight lines - is the
-    // real thing; the dressing is a stand-in until there is art for it.
+    // They used to be journeys - a lane with corners, a ramp to another deck, a route
+    // across a site. Those read well from above and badly from the driver's seat: the
+    // player could not see where they were being sent, could drive off the end of the
+    // world, and one wall in the wrong place could shut the only way through. A lot has
+    // none of those failure modes.
     //
-    // There are no ceilings over the underground decks. The follow camera sits four metres
-    // up and would spend the level inside the slab; pillars, walls and markings carry the
-    // idea without blinding the player.
+    // A layout is written in the lot's own space: +Z is the way the car faces at the
+    // start, the lot runs from z = 0 to z = length and from x = -width/2 to +width/2.
+    //
+    // There are six shapes of lot, below, and the levels work through them in turn so no
+    // two in a row look the same.
     public static class MissionCourseLibrary
     {
         public class Course
@@ -35,995 +38,793 @@ namespace CarParkingGame.EditorTools
             public float width;
             public float length;
 
-            // False for the courses that build more than one deck; they lay their own
-            // floors and rails.
+            // False for a course that builds more than one deck; it lays its own floors
+            // and rails. Every lot is one deck.
             public bool singleDeck = true;
+
+            // A closed car park rather than somewhere to drive through, so the wall round
+            // it is sealed and striped instead of being left open at an entrance.
+            public bool arena;
+
             public Action<Writer> layout;
         }
 
-        private const float LaneWide = 7f;
-        private const float LaneNarrow = 5.2f;
+        // ----- bay plans -------------------------------------------------------------------
+        //
+        // A row, column or ring of bays is written as a picture of it, one character per
+        // bay:
+        //
+        //   .  an empty bay
+        //   #  a bay with a car already in it
+        //   T  a space to fill, nose the way the painted arrow points
+        //   t  a space to fill, either way round - no arrow, and no heading check
+        //      a space in the string leaves a gap with no bay painted at all
+        //
+        // Bays are filled in the order they are written, and that order is what the P 1/3
+        // counter on the HUD counts.
+
+        // ===== shape 1: the four-row lot ====================================================
+        //
+        // Two full-width rows against the end walls and an island of two short rows in the
+        // middle, with an aisle either side of the island and a lane round each end of it.
+        //
+        //     z = 46  +-------------------------------------+
+        //             |   # # # # # # # # #   far row       |
+        //             |                                     |
+        //        lane |          # # # # #    island        | lane
+        //             |          # # # # #                  |
+        //             |                                     |
+        //             |   # # # # # # # # #   near row      |
+        //     z = 0   +-------------------------------------+
+
+        private const float LotWidth = 34f;
+        private const float LotLength = 46f;
+
+        private const float Row1 = 4f;
+        private const float Row2 = 19.2f;
+        private const float Row3 = 25.6f;
+        private const float Row4 = 40.8f;
+
+        private const float NearAisle = 11.6f;
+        private const float FarAisle = 33.2f;
+
+        private const float WideLeft = -13.8f;
+        private const float IslandLeft = -6.9f;
+        private const float SideLane = -12.8f;
+
+        private static void Near(Writer c, string plan) => c.BayRow(WideLeft, Row1, 180f, plan);
+        private static void IslandNear(Writer c, string plan) => c.BayRow(IslandLeft, Row2, 0f, plan);
+        private static void IslandFar(Writer c, string plan) => c.BayRow(IslandLeft, Row3, 180f, plan);
+        private static void Far(Writer c, string plan) => c.BayRow(WideLeft, Row4, 0f, plan);
+
+        private static void LotStart(Writer c, float x = 0f)
+        {
+            c.Start(x, NearAisle);
+
+            c.Route(new Vector2(-15f, NearAisle), new Vector2(15f, NearAisle));
+            c.Route(new Vector2(SideLane, NearAisle), new Vector2(SideLane, FarAisle));
+            c.Route(new Vector2(-15f, FarAisle), new Vector2(15f, FarAisle));
+        }
+
+        // ===== shape 2: the walled yard =====================================================
+        //
+        // Bays round all four walls facing inward, and nothing at all in the middle. Every
+        // bay is reached off the same open square, so the problem is the angle rather than
+        // the route.
+
+        private const float YardWidth = 36f;
+        private const float YardLength = 38f;
+
+        private const float YardNearZ = 3.6f;
+        private const float YardFarZ = 34.4f;
+        private const float YardLeftX = -14.6f;
+        private const float YardRightX = 14.6f;
+        private const float YardColumnZ = 10.5f;
+
+        private static void YardNear(Writer c, string plan) => c.BayRow(WideLeft, YardNearZ, 180f, plan);
+        private static void YardFar(Writer c, string plan) => c.BayRow(WideLeft, YardFarZ, 0f, plan);
+        private static void YardLeft(Writer c, string plan) => c.BayColumn(YardLeftX, YardColumnZ, 270f, plan);
+        private static void YardRight(Writer c, string plan) => c.BayColumn(YardRightX, YardColumnZ, 90f, plan);
+
+        private static void YardStart(Writer c, float x = 0f, float z = 19f)
+        {
+            c.Start(x, z);
+
+            // Once round the open middle: if any of it is shut, a car cannot get round.
+            c.Route(
+                new Vector2(-9f, 10f), new Vector2(9f, 10f),
+                new Vector2(9f, 28f), new Vector2(-9f, 28f),
+                new Vector2(-9f, 10f));
+        }
+
+        // ===== shape 3: the fountain square =================================================
+        //
+        // A yard with a fountain in the middle of it, so the open square becomes a loop and
+        // the far bays can only be reached round one side or the other.
+
+        private const float SquareWidth = 34f;
+        private const float SquareLength = 42f;
+
+        private const float SquareNearZ = 3.6f;
+        private const float SquareFarZ = 38.4f;
+        private const float SquareLeftX = -13.6f;
+        private const float SquareRightX = 13.6f;
+        private const float SquareColumnZ = 12f;
+
+        private static void SquareNear(Writer c, string plan) => c.BayRow(WideLeft, SquareNearZ, 180f, plan);
+        private static void SquareFar(Writer c, string plan) => c.BayRow(WideLeft, SquareFarZ, 0f, plan);
+        private static void SquareLeft(Writer c, string plan) => c.BayColumn(SquareLeftX, SquareColumnZ, 270f, plan);
+        private static void SquareRight(Writer c, string plan) => c.BayColumn(SquareRightX, SquareColumnZ, 90f, plan);
+
+        private static void SquareStart(Writer c, float x = 0f)
+        {
+            c.Start(x, 10f);
+
+            c.Route(
+                new Vector2(-9f, 12f), new Vector2(9f, 12f),
+                new Vector2(9f, 30f), new Vector2(-9f, 30f),
+                new Vector2(-9f, 12f));
+        }
+
+        // ===== shape 4: the circus ==========================================================
+        //
+        // Eight bays set round a ring, every one of them square on to a fountain in the
+        // middle. Nothing in a circus is parallel to anything else, which is the whole
+        // point of it: the car has to be lined up with the bay rather than with the lot.
+        //
+        // No route is recorded. There is nothing in a circus that can shut a way through -
+        // the bays stand clear of each other with seven metres of tarmac between them, and
+        // the four corners of the lot are empty.
+
+        private const float CircusWidth = 36f;
+        private const float CircusLength = 44f;
+
+        private const float CircusCentreZ = 24f;
+        private const float CircusRadius = 13f;
+
+        private static void Circus(Writer c, string plan, bool noseIn = true)
+        {
+            c.Fountain(0f, CircusCentreZ, 3.5f);
+            c.BayRing(0f, CircusCentreZ, CircusRadius, plan, noseIn);
+        }
+
+        private static void CircusStart(Writer c, float x = 0f)
+        {
+            c.Start(x, 4f);
+        }
+
+        // ===== shape 5: the crossroads ======================================================
+        //
+        // Four bays, one at each point of the compass, all facing the middle. Small, quick,
+        // and every bay wants the car at a different angle.
+
+        private const float CrossWidth = 28f;
+        private const float CrossLength = 30f;
+
+        private const float CrossCentreZ = 15f;
+
+        private static void Cross(Writer c, char north, char east, char south, char west)
+        {
+            c.BayRow(0f, CrossCentreZ + 7f, 180f, north.ToString());
+            c.BayRow(7f, CrossCentreZ, 270f, east.ToString());
+            c.BayRow(0f, CrossCentreZ - 7f, 0f, south.ToString());
+            c.BayRow(-7f, CrossCentreZ, 90f, west.ToString());
+        }
+
+        private static void CrossStart(Writer c, float x = -10f)
+        {
+            c.Start(x, 4f);
+
+            c.Route(
+                new Vector2(-11.5f, 4f), new Vector2(11.5f, 4f),
+                new Vector2(11.5f, 26f), new Vector2(-11.5f, 26f),
+                new Vector2(-11.5f, 4f));
+        }
+
+        // ===== shape 6: the alley ===========================================================
+        //
+        // Long, narrow, and lined down both walls. One aisle, no way round, and every bay
+        // entered off the same straight.
+
+        private const float AlleyWidth = 26f;
+        private const float AlleyLength = 48f;
+
+        private const float AlleyLeftX = -9.8f;
+        private const float AlleyRightX = 9.8f;
+        private const float AlleyFirstZ = 6f;
+
+        private static void AlleyLeft(Writer c, string plan) => c.BayColumn(AlleyLeftX, AlleyFirstZ, 270f, plan);
+        private static void AlleyRight(Writer c, string plan) => c.BayColumn(AlleyRightX, AlleyFirstZ, 90f, plan);
+
+        private static void AlleyStart(Writer c)
+        {
+            c.Start(0f, 6f);
+            c.Route(new Vector2(0f, 5f), new Vector2(0f, 44f));
+        }
+
+        // ----- the catalogue ----------------------------------------------------------------
 
         public static IReadOnlyList<Course> All => Courses;
 
+        private static Course Make(int id, string name, string description, int difficulty,
+            float width, float length, Action<Writer> layout)
+        {
+            return new Course
+            {
+                missionId = id,
+                name = name,
+                description = description,
+
+                // Forward for all of them. Which way round a bay wants the car is said by
+                // the arrow painted in it, not by the mission type, which would demand the
+                // same of every bay in the level.
+                parkingType = ParkingType.Forward,
+                difficulty = difficulty,
+                width = width,
+                length = length,
+                arena = true,
+                layout = layout
+            };
+        }
+
+        private static Course Lot(int id, string name, string text, int d, Action<Writer> l)
+            => Make(id, name, text, d, LotWidth, LotLength, l);
+
+        private static Course Yard(int id, string name, string text, int d, Action<Writer> l)
+            => Make(id, name, text, d, YardWidth, YardLength, l);
+
+        private static Course Square(int id, string name, string text, int d, Action<Writer> l)
+            => Make(id, name, text, d, SquareWidth, SquareLength, l);
+
+        private static Course Ring(int id, string name, string text, int d, Action<Writer> l)
+            => Make(id, name, text, d, CircusWidth, CircusLength, l);
+
+        private static Course Crossroads(int id, string name, string text, int d, Action<Writer> l)
+            => Make(id, name, text, d, CrossWidth, CrossLength, l);
+
+        private static Course Alley(int id, string name, string text, int d, Action<Writer> l)
+            => Make(id, name, text, d, AlleyWidth, AlleyLength, l);
+
         private static readonly List<Course> Courses = new List<Course>
         {
-            new Course
-            {
-                missionId = 9,
-                name = "Cone Slalom",
-                description = "Weave the cones, then park straight at the end.",
-                parkingType = ParkingType.Forward,
-                difficulty = 2,
-                width = 26f,
-                length = 72f,
-                layout = Slalom
-            },
-            new Course
-            {
-                missionId = 10,
-                name = "The L Bend",
-                description = "A walled training lane with one square corner, and a bay around it.",
-                parkingType = ParkingType.Forward,
-                difficulty = 2,
-                width = 46f,
-                length = 46f,
-                layout = LBend
-            },
-            new Course
-            {
-                missionId = 11,
-                name = "The S Bend",
-                description = "A narrow S between kerbs and cones, with the bay at the finish.",
-                parkingType = ParkingType.Forward,
-                difficulty = 3,
-                width = 36f,
-                length = 62f,
-                layout = SBend
-            },
-            new Course
-            {
-                missionId = 12,
-                name = "Between Walls",
-                description = "A straight lane with a hand's width either side of the mirrors.",
-                parkingType = ParkingType.Forward,
-                difficulty = 3,
-                width = 18f,
-                length = 58f,
-                layout = BetweenWalls
-            },
-            new Course
-            {
-                missionId = 13,
-                name = "Tight Corners",
-                description = "A service road with two square corners and concrete on both sides.",
-                parkingType = ParkingType.Forward,
-                difficulty = 3,
-                width = 48f,
-                length = 48f,
-                layout = TightCorners
-            },
-            new Course
-            {
-                missionId = 14,
-                name = "The Courtyard",
-                description = "A walled yard with no room to turn and one slot worth having.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 4,
-                width = 32f,
-                length = 34f,
-                layout = Courtyard
-            },
-            new Course
-            {
-                missionId = 15,
-                name = "Supermarket",
-                description = "Rows of shoppers' cars, trolley shelters and one free bay.",
-                parkingType = ParkingType.Forward,
-                difficulty = 3,
-                width = 58f,
-                length = 50f,
-                layout = Supermarket
-            },
-            new Course
-            {
-                missionId = 16,
-                name = "Full Car Park",
-                description = "Narrow aisles, crossings everywhere, and the only space is at the back.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 4,
-                width = 52f,
-                length = 52f,
-                layout = FullCarPark
-            },
-            new Course
-            {
-                missionId = 17,
-                name = "Petrol Station",
-                description = "Round the pumps and in beside the shop.",
-                parkingType = ParkingType.Forward,
-                difficulty = 3,
-                width = 42f,
-                length = 40f,
-                layout = PetrolStation
-            },
-            new Course
-            {
-                missionId = 18,
-                name = "On The Street",
-                description = "Kerbside parallel parking between two cars, with traffic behind you.",
-                parkingType = ParkingType.Parallel,
-                difficulty = 4,
-                width = 38f,
-                length = 58f,
-                layout = OnTheStreet
-            },
-            new Course
-            {
-                missionId = 19,
-                name = "Bus Station",
-                description = "Reverse into the gap between two coaches.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 4,
-                width = 48f,
-                length = 52f,
-                layout = BusStation
-            },
-            new Course
-            {
-                missionId = 20,
-                name = "Loading Yard",
-                description = "Back up to the warehouse dock through the stacked freight.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 4,
-                width = 50f,
-                length = 48f,
-                layout = LoadingYard
-            },
-            new Course
-            {
-                missionId = 21,
-                name = "Container Maze",
-                description = "Corridors of containers, square corners, bay at the far end.",
-                parkingType = ParkingType.Forward,
-                difficulty = 4,
-                width = 46f,
-                length = 50f,
-                layout = ContainerMaze
-            },
-            new Course
-            {
-                missionId = 22,
-                name = "Road Works",
-                description = "Barricades, barrels and cones narrowing a working site.",
-                parkingType = ParkingType.Forward,
-                difficulty = 4,
-                width = 42f,
-                length = 50f,
-                layout = RoadWorks
-            },
-            new Course
-            {
-                missionId = 23,
-                name = "Car Park Deck",
-                description = "Wide lanes between the pillars and a bay near the entrance.",
-                parkingType = ParkingType.Forward,
-                difficulty = 3,
-                width = 42f,
-                length = 40f,
-                layout = CarParkDeck
-            },
-            new Course
-            {
-                missionId = 24,
-                name = "Pillars And Posts",
-                description = "The same deck with half the room and a slot on the back wall.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 5,
-                width = 38f,
-                length = 42f,
-                layout = PillarsAndPosts
-            },
-            new Course
-            {
-                missionId = 25,
-                name = "Down The Ramp",
-                singleDeck = false,
-                description = "Follow the ramp to the lower deck and park there.",
-                parkingType = ParkingType.Forward,
-                difficulty = 4,
-                width = 36f,
-                length = 58f,
-                layout = DownTheRamp
-            },
-            new Course
-            {
-                missionId = 26,
-                name = "Upper Deck",
-                singleDeck = false,
-                description = "Up one level, then into a bay among the parked cars.",
-                parkingType = ParkingType.Forward,
-                difficulty = 4,
-                width = 40f,
-                length = 64f,
-                layout = UpperDeck
-            },
-            new Course
-            {
-                missionId = 27,
-                name = "Rooftop",
-                singleDeck = false,
-                description = "Climb to the roof deck and reverse in against the parapet.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 5,
-                width = 40f,
-                length = 70f,
-                layout = Rooftop
-            },
-            new Course
-            {
-                missionId = 28,
-                name = "The Driving Test",
-                description = "Slalom, S bend, square corner, and reverse in at the end.",
-                parkingType = ParkingType.Reverse,
-                difficulty = 5,
-                width = 42f,
-                length = 84f,
-                layout = DrivingTest
-            },
-            new Course
-            {
-                missionId = 29,
-                name = "The Maze",
-                description = "Dead ends and shortcuts between you and the last free space.",
-                parkingType = ParkingType.Forward,
-                difficulty = 5,
-                width = 54f,
-                length = 54f,
-                layout = Maze
-            },
-            new Course
-            {
-                missionId = 30,
-                name = "Final Examination",
-                singleDeck = false,
-                description = "Ramp, pillars, parked cars, and a parallel space with nothing to spare.",
-                parkingType = ParkingType.Parallel,
-                difficulty = 5,
-                width = 46f,
-                length = 74f,
-                layout = FinalExamination
-            }
+            Lot(9,         "Open Lot",        "An empty lot and one space. Either way round will do.",          1, OpenLot),
+            Lot(10,        "First Row",       "One space in the near row, with an arrow saying which way in.",  1, FirstRow),
+            Alley(11,      "The Alley",       "One space off a straight run between two walls.",                1, TheAlley),
+            Lot(12,        "Side By Side",    "A space with a car tight against each side of it.",              2, SideBySide),
+            Yard(13,       "The Yard",        "Bays round all four walls, and one of them is yours.",           2, TheYard),
+            Lot(14,        "The Back Row",    "Past the island and all the way to the far wall.",               2, BackRow),
+            Crossroads(15, "Crossroads",      "Two spaces, and they face opposite ways.",                       2, CrossroadsTwo),
+            Lot(16,        "Two Stops",       "Two spaces, one at each end of the lot.",                        2, TwoStops),
+            Square(17,     "The Fountain",    "A square with water in the middle and one space behind it.",     2, TheFountain),
+            Lot(18,        "The Island",      "Both spaces are on the island in the middle.",                   3, TheIsland),
+            Alley(19,      "Both Walls",      "Two spaces down the alley, one on each side.",                   3, BothWalls),
+            Lot(20,        "Cones Out",       "The near aisle is coned down to half its width.",                3, ConesOut),
+            Yard(21,       "Corner Work",     "Two spaces, both of them in a corner of the yard.",              3, CornerWork),
+            Lot(22,        "Road Works",      "Barricades across the lot and two spaces behind them.",          3, RoadWorks),
+            Ring(23,       "The Circus",      "Eight bays round a fountain. Not one of them is square on.",     3, TheCircus),
+            Lot(24,        "Tight Fit",       "The lot is full but for one space, and it is not a wide one.",   3, TightFit),
+            Square(25,     "Garden Square",   "Planting round the fountain, and two spaces past it.",           3, GardenSquare),
+            Lot(26,        "Both Ends",       "Opposite corners, with the island to get round.",                3, BothEnds),
+            Alley(27,      "Long Alley",      "Two spaces at the far end of a full alley.",                     4, LongAlley),
+            Lot(28,        "Three Stops",     "Three spaces, and no two of them near each other.",              4, ThreeStops),
+            Yard(29,       "Round The Walls", "Three spaces, one on each of three walls.",                      4, RoundTheWalls),
+            Lot(30,        "Nose Out",        "Two spaces, both arrows pointing back out. Reverse in.",         4, NoseOut),
+            Crossroads(31, "Four Ways",       "All four points of the compass, one after another.",             4, FourWays),
+            Lot(32,        "Any Way Round",   "Three spaces, not one of them marked with an arrow.",            3, AnyWayRound),
+            Ring(33,       "Fountain Ring",   "Three bays off the circus, and none of them adjacent.",          4, FountainRing),
+            Lot(34,        "Read The Paint",  "Three spaces. Two say which way round, one does not.",           4, ReadThePaint),
+            Square(35,     "The Promenade",   "A busy square, two spaces, and a fountain in the way.",          4, ThePromenade),
+            Lot(36,        "Full House",      "Three spaces in a lot with almost nothing left in it.",          4, FullHouse),
+            Alley(37,      "Tight Alley",     "Three spaces, and parked cars the whole length of both walls.",  4, TightAlley),
+            Yard(38,       "Walled In",       "Three spaces in a yard with barriers across the middle.",        4, WalledIn),
+            Lot(39,        "The Gauntlet",    "Cones, barrels and barricades, and three spaces behind them.",   5, Gauntlet),
+            Ring(40,       "Carousel",        "Three bays round the circus, all of them facing outward.",       5, Carousel),
+            Lot(41,        "Four Corners",    "One space in each corner of the lot.",                           4, FourCorners),
+            Square(42,     "Park Life",       "Three spaces round a square full of planting and people.",       4, ParkLife),
+            Crossroads(43, "Compass",         "Four spaces, four headings, and barrels between them.",          5, Compass),
+            Lot(44,        "Rush Hour",       "Four spaces in a lot that is otherwise full.",                   5, RushHour),
+            Alley(45,      "The Run",         "Four spaces down one long alley, in order.",                     5, TheRun),
+            Yard(46,       "Clearing Up",     "Four spaces round a yard with the middle half blocked.",         5, ClearingUp),
+            Lot(47,        "Obstacle Course", "Four spaces, with something in the way of every one of them.",   5, ObstacleCourse),
+            Ring(48,       "Last Ring",       "Four bays off the circus, mixed arrows, nothing square on.",     5, LastRing),
+            Square(49,     "Night Shift",     "Four spaces round a full square. Mind the fountain.",            5, NightShift),
+            Lot(50,        "Final Lot",       "Four spaces, mixed arrows, and nowhere to be careless.",         5, FinalLot)
         };
 
-        // ----- shared shapes -------------------------------------------------------------
+        // ----- the four-row lots --------------------------------------------------------
 
-        // Walls or cones down both sides of a path, which is most of what a training course
-        // is. The path is a centre line; the edges are offset perpendicular to each leg.
-        private static void Lane(Writer c, Vector2[] path, float halfWidth, bool walls, float wallHeight = 2.2f)
+        private static void OpenLot(Writer c)
         {
-            c.Route(path);
+            LotStart(c);
 
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Vector2[] edge = OffsetPath(path, side * halfWidth);
-
-                for (int i = 0; i < edge.Length - 1; i++)
-                {
-                    Vector2 from = edge[i];
-                    Vector2 to = edge[i + 1];
-
-                    if (walls)
-                    {
-                        c.Wall(from.x, from.y, to.x, to.y, wallHeight);
-                    }
-                    else
-                    {
-                        int count = Mathf.Max(2, Mathf.RoundToInt((to - from).magnitude / 3f));
-                        c.Cones(from.x, from.y, to.x, to.y, count);
-                    }
-                }
-            }
+            // No arrow in the bay, so the heading is not checked either. The first lot is
+            // about getting the car between two painted lines and nothing else.
+            Near(c, "..#..t..#");
+            Far(c, "..#.....#");
         }
 
-        // One side of a lane: the centre line walked at a fixed distance, meeting each
-        // corner where the two offset legs cross rather than where the centre line turns.
-        //
-        // Offsetting each leg on its own is what put a wall across the L bend. The inside
-        // edge of the leg after a square corner starts half a lane short of the corner, so
-        // on its own it runs straight across the leg before it and seals the lane - the
-        // wall "sticking out so the car cannot get past" in the report.
-        private static Vector2[] OffsetPath(Vector2[] path, float distance)
+        private static void FirstRow(Writer c)
         {
-            var edge = new Vector2[path.Length];
-            int last = path.Length - 1;
+            LotStart(c);
 
-            edge[0] = path[0] + Perpendicular(path[1] - path[0]) * distance;
-            edge[last] = path[last] + Perpendicular(path[last] - path[last - 1]) * distance;
-
-            for (int i = 1; i < last; i++)
-            {
-                Vector2 incoming = (path[i] - path[i - 1]).normalized;
-                Vector2 outgoing = (path[i + 1] - path[i]).normalized;
-
-                Vector2 onIncoming = path[i] + Perpendicular(incoming) * distance;
-                Vector2 onOutgoing = path[i] + Perpendicular(outgoing) * distance;
-
-                // Parallel legs, or a reversal: there is no crossing point, and the offset
-                // simply carries straight on.
-                if (!TryCross(onIncoming, incoming, onOutgoing, outgoing, out edge[i]))
-                {
-                    edge[i] = onIncoming;
-                }
-            }
-
-            return edge;
+            Near(c, "#.#.T.#.#");
+            Far(c, "..#...#..");
         }
 
-        private static bool TryCross(Vector2 a, Vector2 alongA, Vector2 b, Vector2 alongB, out Vector2 point)
+        private static void SideBySide(Writer c)
         {
-            float denominator = alongA.x * alongB.y - alongA.y * alongB.x;
+            LotStart(c);
 
-            if (Mathf.Abs(denominator) < 1e-4f)
-            {
-                point = a;
-                return false;
-            }
-
-            Vector2 delta = b - a;
-            float distance = (delta.x * alongB.y - delta.y * alongB.x) / denominator;
-
-            point = a + alongA * distance;
-            return true;
+            Near(c, "#..##T##.");
+            IslandNear(c, "#...#");
+            Far(c, "..#...#..");
         }
 
-        private static Vector2 Perpendicular(Vector2 direction)
+        private static void BackRow(Writer c)
         {
-            Vector2 normalized = direction.normalized;
-            return new Vector2(normalized.y, -normalized.x);
+            LotStart(c);
+
+            Near(c, "#.#.#.#.#");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, ".#.#.");
+            Far(c, "..##T##..");
         }
 
-        // A wall round the outside with a gap at the entrance, for the enclosed courses.
-        private static void Perimeter(Writer c, float inset, float height, float gapHalfWidth, float gapCentreX = 0f)
+        private static void TwoStops(Writer c)
         {
-            float x = c.Width * 0.5f - inset;
-            float front = inset;
-            float back = c.Length - inset;
+            LotStart(c);
 
-            // The gap goes where the course is entered from, which is not always the middle.
-            float gapLeft = Mathf.Clamp(gapCentreX - gapHalfWidth, -x, x);
-            float gapRight = Mathf.Clamp(gapCentreX + gapHalfWidth, -x, x);
-
-            c.Wall(-x, front, gapLeft, front, height);
-            c.Wall(gapRight, front, x, front, height);
-            c.Wall(-x, back, x, back, height);
-            c.Wall(-x, front, -x, back, height);
-            c.Wall(x, front, x, back, height);
+            Near(c, "T.#.#.#.#");
+            IslandNear(c, "#...#");
+            Far(c, "#.#.#.#.T");
         }
 
-        // A shipping container, a coach, a fuel pump: things the project has no model of,
-        // standing in as a block of the right size.
-        private static void Container(Writer c, float x, float z, float yaw)
+        private static void TheIsland(Writer c)
         {
-            c.Block(x, z, yaw, 2.5f, 2.7f, 6.3f, Part.ConcreteRed);
+            LotStart(c);
+
+            Near(c, "#.#.#.#.#");
+            IslandNear(c, "#.T.#");
+            IslandFar(c, "#.T.#");
+            Far(c, "..#...#..");
         }
 
-        private static void Coach(Writer c, float x, float z, float yaw)
+        private static void ConesOut(Writer c)
         {
-            c.Block(x, z, yaw, 2.6f, 3.2f, 11f, Part.Concrete);
-        }
-
-        // ----- the courses ----------------------------------------------------------------
-
-        private static void Slalom(Writer c)
-        {
-            c.Start(0f, 4f);
-
-            c.Kerb(-LaneWide, 6f, -LaneWide, 54f);
-            c.Kerb(LaneWide, 6f, LaneWide, 54f);
-
-            c.Slalom(12f, 46f, 3.2f, 6);
-
-            c.Arrow(0f, 8f, 0f);
-            c.Cones(-3.4f, 54f, -3.4f, 60f, 3);
-            c.Cones(3.4f, 54f, 3.4f, 60f, 3);
-
-            c.Bay(0f, 64f, 0f, 3.4f, 6.5f);
-        }
-
-        private static void LBend(Writer c)
-        {
-            c.Start(0f, 4f);
-
-            Lane(c, new[] { new Vector2(0f, 2f), new Vector2(0f, 30f), new Vector2(20f, 30f) }, LaneNarrow * 0.5f, true);
-
-            c.Cones(-2.2f, 24f, -2.2f, 28f, 3);
-            c.Arrow(0f, 10f, 0f);
-
-            c.Bay(20f, 30f, 90f, 3.3f, 6.5f);
-        }
-
-        private static void SBend(Writer c)
-        {
-            c.Start(0f, 4f);
-
-            var path = new[]
-            {
-                new Vector2(0f, 2f),
-                new Vector2(0f, 14f),
-                new Vector2(8f, 24f),
-                new Vector2(8f, 34f),
-                new Vector2(0f, 44f),
-                new Vector2(0f, 52f)
-            };
-
-            Lane(c, path, 2.9f, false);
-
-            c.Kerb(-6.5f, 4f, -6.5f, 52f);
-            c.Kerb(14.5f, 14f, 14.5f, 44f);
-
-            c.Bay(0f, 57f, 0f, 3.2f, 6.5f);
-        }
-
-        private static void BetweenWalls(Writer c)
-        {
-            c.Start(0f, 3f);
-
-            c.Route(new Vector2(0f, 3f), new Vector2(0f, 44f), new Vector2(0f, 48f));
-
-            // 3.9m between the walls for a 1.95m car: under a metre each side.
-            c.Wall(-1.95f, 6f, -1.95f, 42f, 2.4f);
-            c.Wall(1.95f, 6f, 1.95f, 42f, 2.4f);
-
-            c.Cones(-3.2f, 4f, -3.2f, 5.5f, 2);
-            c.Cones(3.2f, 4f, 3.2f, 5.5f, 2);
-            c.Arrow(0f, 9f, 0f);
-
-            // Opens into a small yard at the far end. The yard's near wall has to be two
-            // walls with the lane's own width between them, or it seals off the only room
-            // the course has to park in.
-            c.Wall(-8f, 42f, -1.95f, 42f, 2.4f);
-            c.Wall(1.95f, 42f, 8f, 42f, 2.4f);
-            c.Wall(-8f, 42f, -8f, 54f, 2.4f);
-            c.Wall(8f, 42f, 8f, 54f, 2.4f);
-            c.Wall(-8f, 54f, 8f, 54f, 2.4f);
-
-            c.Bay(0f, 48f, 0f, 3.3f, 6.5f);
-        }
-
-        private static void TightCorners(Writer c)
-        {
-            c.Start(0f, 4f);
-
-            var path = new[]
-            {
-                new Vector2(0f, 2f),
-                new Vector2(0f, 18f),
-                new Vector2(18f, 18f),
-                new Vector2(18f, 38f)
-            };
-
-            Lane(c, path, 2.95f, true);
-
-            c.Barriers(-6f, 16f, -6f, 22f, 3);
-            c.Prop(Part.Barrel, 6f, 14f, 0f, 1.1f);
-            c.Arrow(0f, 9f, 0f);
-
-            c.Bay(18f, 42f, 0f, 3.2f, 6.5f);
-        }
-
-        private static void Courtyard(Writer c)
-        {
-            c.Start(0f, 4f);
-
-            Perimeter(c, 1.5f, 3f, 4f);
-
-            // Residents' cars down the left and across the back, leaving one slot.
-            c.CarRow(-10f, 10f, 90f, 3, 3.2f, true);
-            c.Car(-10f, 24f, 90f, Car.Hatchback);
-
-            c.Car(3.5f, 27f, 180f, Car.Sedan);
-            c.Car(10.5f, 27f, 180f, Car.Muscle);
-
-            c.Prop(Part.Barrel, 12f, 8f, 0f, 1.1f);
-            c.Prop(Part.Barrel, 12f, 10f, 0f, 1.1f);
-
-            // The gap between the two cars at the back; the yard is too tight to drive in
-            // nose first, which is what makes it a reverse.
-            c.Bay(7f, 27f, 180f, 3.0f, 6.3f);
-        }
-
-        private static void Supermarket(Writer c)
-        {
-            c.Start(-20f, 4f);
-
-            // The store across the back.
-            c.Block(0f, 46f, 0f, 44f, 7f, 8f);
-
-            // The rows leave a cross aisle in the middle, from x = -3.8 to x = 3, and that
-            // aisle is the only way to the back of the car park. The row kerbs have to stop
-            // either side of it - run across it and the course is sealed at the first row,
-            // with every space beyond it unreachable.
-            const float AisleLeft = -4.5f;
-            const float AisleRight = 3.5f;
-
-            // Three rows of bays, nose to nose, with aisles between them.
-            for (int row = 0; row < 3; row++)
-            {
-                float z = 14f + row * 13f;
-
-                c.CarRow(-24f, z, 0f, 7, 3.2f);
-                c.CarRow(4f, z, 0f, 6, 3.2f);
-
-                c.Kerb(-26f, z + 3.4f, AisleLeft, z + 3.4f);
-                c.Kerb(AisleRight, z + 3.4f, 26f, z + 3.4f);
-            }
-
-            // Along the front of the first row and up the cross aisle: the way in, which
-            // is not obvious from the driver's seat with a row of cars across the view.
-            c.Route(new Vector2(-20f, 6f), new Vector2(-0.4f, 6f), new Vector2(-0.4f, 27f));
-
-            c.Arrow(-12f, 6.5f, 90f);
-            c.Arrow(-0.4f, 13f, 0f);
-
-            // Trolley shelters.
-            c.Block(20f, 20f, 0f, 3f, 2.6f, 7f, Part.ConcreteYellow);
-            c.Block(20f, 33f, 0f, 3f, 2.6f, 7f, Part.ConcreteYellow);
-
-            // The one free space, in the middle row.
-            c.Bay(0f, 27f, 0f, 3.3f, 6.4f);
-        }
-
-        private static void FullCarPark(Writer c)
-        {
-            c.Start(-18f, 4f);
-
-            // As in the supermarket: the cross aisle between the two blocks of each row is
-            // the only route to the back, so the kerbs stop either side of it.
-            const float AisleLeft = -6f;
-            const float AisleRight = 1.5f;
-
-            for (int row = 0; row < 4; row++)
-            {
-                float z = 12f + row * 11f;
-
-                c.CarRow(-22f, z, 0f, 6, 3.1f);
-                c.CarRow(2f, z, 0f, 6, 3.1f);
-
-                c.Kerb(-24f, z + 3.2f, AisleLeft, z + 3.2f);
-                c.Kerb(AisleRight, z + 3.2f, 24f, z + 3.2f);
-            }
-
-            c.Route(new Vector2(-18f, 6f), new Vector2(-2.25f, 6f), new Vector2(-2.25f, 45f));
-
-            c.Wall(-25f, 2f, -25f, 50f, 2.2f);
-            c.Wall(25f, 2f, 25f, 50f, 2.2f);
-            c.Wall(-25f, 50f, 25f, 50f, 2.2f);
-
-            c.Arrow(-10f, 6.5f, 90f);
-            c.Arrow(-2.25f, 12f, 0f);
-
-            // Deep inside, on the back row, with a car either side. The bay faces back
-            // down the aisle: this is a reverse mission, so the nose ends up pointing out.
-            //
-            // Only the left-hand car is placed here. The right-hand one is already in the
-            // back row - a second car on the same spot was two cars inside each other.
-            c.Bay(-1.5f, 45f, 180f, 3.0f, 6.3f);
-            c.Car(-5f, 45f, 0f, Car.Sedan);
-        }
-
-        private static void PetrolStation(Writer c)
-        {
-            c.Start(-16f, 4f);
-
-            // Two pump islands under a canopy.
-            for (int island = 0; island < 2; island++)
-            {
-                float x = -8f + island * 10f;
-
-                c.Kerb(x - 3f, 16f, x + 3f, 16f);
-                c.Block(x - 1.6f, 16f, 0f, 1f, 1.9f, 1f, Part.ConcreteYellow);
-                c.Block(x + 1.6f, 16f, 0f, 1f, 1.9f, 1f, Part.ConcreteYellow);
-
-                c.Pillars(x - 3f, 12f, x + 3f, 12f, 2, 4.5f);
-                c.Pillars(x - 3f, 20f, x + 3f, 20f, 2, 4.5f);
-            }
-
-            // The shop.
-            c.Block(14f, 32f, 0f, 14f, 5f, 10f);
-
-            c.Car(-14f, 30f, 0f, Car.Hatchback);
-            c.Car(-10f, 30f, 0f, Car.Classic);
-
-            c.Arrow(-16f, 9f, 0f);
-            c.Kerb(-20f, 38f, 4f, 38f);
-
-            c.Bay(1f, 32f, 0f, 3.3f, 6.5f);
-        }
-
-        private static void OnTheStreet(Writer c)
-        {
-            c.Start(-2.5f, 4f);
-
-            // Road, pavement and buildings on one side.
-            c.Kerb(5f, 2f, 5f, 56f);
-            c.Kerb(-9f, 2f, -9f, 56f);
-
-            c.Block(13f, 16f, 0f, 12f, 9f, 16f);
-            c.Block(13f, 40f, 0f, 12f, 11f, 18f);
-
-            for (int lamp = 0; lamp < 4; lamp++)
-            {
-                c.Prop(Part.Lamp, 6.5f, 10f + lamp * 13f, 180f, 5.5f);
-            }
-
-            // Kerbside queue with a gap in the middle. The cars are about 5m long, so
-            // leaving their centres 14m apart gives a 9m space: room to swing in, and
-            // nothing like enough to drive straight into.
-            c.Car(2.6f, 17f, 0f, Car.Sedan);
-            c.Car(2.6f, 24f, 0f, Car.Hatchback);
-            c.Car(2.6f, 38f, 0f, Car.Muscle);
-            c.Car(2.6f, 45f, 0f, Car.Classic);
-
-            c.Arrow(-3f, 10f, 0f);
-
-            c.Bay(2.6f, 31f, 0f, 2.9f, 7f);
-        }
-
-        private static void BusStation(Writer c)
-        {
-            c.Start(-14f, 4f);
-
-            // Two coaches with a bay's width between them, and a third parked across the
-            // yard so the approach is not a straight run.
-            Coach(c, -4.2f, 34f, 0f);
-            Coach(c, 4.2f, 34f, 0f);
-            Coach(c, 16f, 20f, 90f);
-
-            c.Kerb(-22f, 44f, 22f, 44f);
-            c.Kerb(-6f, 14f, 6f, 14f);
-
-            c.Block(0f, 48f, 0f, 20f, 4.5f, 6f);
-
-            c.Prop(Part.PedestrianBarrier, -4f, 14f, 90f, 1.1f);
-            c.Prop(Part.PedestrianBarrier, 4f, 14f, 90f, 1.1f);
-
-            c.Arrow(-14f, 10f, 0f);
-
-            // The gap between the two coaches, reversed into, so the nose ends up facing
-            // back out of the stand.
-            c.Bay(0f, 34f, 180f, 3.1f, 6.6f);
-        }
-
-        private static void LoadingYard(Writer c)
-        {
-            c.Start(-18f, 4f);
-
-            // Warehouse and its dock across the back.
-            c.Block(0f, 44f, 0f, 46f, 9f, 8f);
-            c.Kerb(-20f, 39.5f, 20f, 39.5f);
-
-            Container(c, -16f, 14f, 0f);
-            Container(c, -16f, 21f, 0f);
-            Container(c, -9f, 17f, 90f);
-            Container(c, 14f, 14f, 0f);
-            Container(c, 14f, 21f, 0f);
-            Container(c, 20f, 30f, 0f);
-
-            c.Prop(Part.Barrel, -4f, 26f, 0f, 1.1f);
-            c.Prop(Part.Barrel, -2.6f, 26f, 0f, 1.1f);
-            c.Prop(Part.Barrel, 8f, 30f, 0f, 1.1f);
-
-            c.Barriers(-22f, 32f, -12f, 32f, 4);
-            c.Arrow(-18f, 10f, 0f);
-
-            // Backed up to the dock, so the nose ends up facing out into the yard.
-            c.Bay(2f, 35f, 180f, 3.1f, 6.5f);
-        }
-
-        private static void ContainerMaze(Writer c)
-        {
-            c.Start(-16f, 4f);
-
-            // Corridors: in along the bottom, right, up, left, and the bay at the top.
-            for (int i = 0; i < 5; i++)
-            {
-                Container(c, -16f + i * 7f, 12f, 90f);
-            }
-
-            for (int i = 0; i < 4; i++)
-            {
-                Container(c, 16f, 16f + i * 7f, 0f);
-            }
-
-            for (int i = 0; i < 4; i++)
-            {
-                Container(c, 8f - i * 7f, 26f, 90f);
-            }
-
-            Container(c, -18f, 32f, 0f);
-            Container(c, -18f, 39f, 0f);
-
-            c.Wall(-21f, 2f, -21f, 48f, 3f);
-            c.Wall(21f, 2f, 21f, 48f, 3f);
-            c.Wall(-21f, 48f, 21f, 48f, 3f);
-
-            c.Cones(-12f, 30f, -12f, 36f, 3);
-            c.Arrow(-16f, 8f, 0f);
-
-            c.Bay(2f, 42f, 0f, 3.2f, 6.5f);
+            LotStart(c);
+
+            Near(c, "#.##T##.#");
+            IslandNear(c, "#.#.#");
+            Far(c, "..#...#..");
+
+            // Off the middle of the aisle rather than across it, so the aisle narrows
+            // instead of closing.
+            c.Cones(-9f, NearAisle + 3.4f, 13f, NearAisle + 3.4f, 7);
+            c.Prop(Part.Barrel, -9f, NearAisle - 3.2f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 9f, NearAisle - 3.2f, 0f, 1.1f);
         }
 
         private static void RoadWorks(Writer c)
         {
-            c.Start(0f, 4f);
+            LotStart(c, -11f);
 
-            for (int i = 0; i < 6; i++)
-            {
-                float z = 10f + i * 5f;
-                c.Prop(Part.WaterBarricade, -4.5f, z, 0f, 1.1f);
-                c.Prop(Part.WaterBarricade, 4.5f, z, 0f, 1.1f);
-            }
+            Near(c, "#.#.#.T.#");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#...#");
+            Far(c, "#.#.T.#.#");
 
-            c.Prop(Part.Channelizing, -2.5f, 22f, 0f, 1.1f);
-            c.Prop(Part.Channelizing, 2.5f, 30f, 0f, 1.1f);
-
-            c.Cones(-3.5f, 40f, -3.5f, 46f, 3);
-            c.Cones(3.5f, 40f, 3.5f, 46f, 3);
-
-            c.Prop(Part.Barrel, -8f, 18f, 0f, 1.1f);
-            c.Prop(Part.Barrel, 8f, 26f, 0f, 1.1f);
-            c.Prop(Part.VerticalPanel, 0f, 8f, 0f, 1.2f);
-
-            // Spoil heaps and plant, as blocks.
-            c.Block(-13f, 30f, 0f, 6f, 2f, 10f, Part.ConcreteYellow);
-            c.Block(13f, 36f, 0f, 5f, 2.4f, 8f, Part.ConcreteYellow);
-
-            c.Bay(0f, 45f, 0f, 3.2f, 6.5f);
+            c.Prop(Part.WaterBarricade, -3f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Prop(Part.WaterBarricade, 0.5f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Prop(Part.WaterBarricade, 4f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Prop(Part.VerticalPanel, 8f, FarAisle - 3.4f, 0f, 1.2f);
+            c.Prop(Part.Channelizing, -8f, FarAisle + 3.4f, 0f, 1.1f);
         }
 
-        private static void CarParkDeck(Writer c)
+        private static void TightFit(Writer c)
         {
-            c.Start(-16f, 4f);
+            LotStart(c);
 
-            Perimeter(c, 1.5f, 2.6f, 5f, -16f);
-
-            // Pillar grid, generously spaced.
-            for (int row = 0; row < 3; row++)
-            {
-                c.Pillars(-16f, 12f + row * 12f, 16f, 12f + row * 12f, 5);
-            }
-
-            c.CarRow(-18f, 18f, 0f, 4, 3.3f);
-            c.CarRow(6f, 30f, 0f, 4, 3.3f);
-
-            c.Arrow(-16f, 9f, 0f);
-            c.Kerb(-20f, 36f, 20f, 36f);
-
-            c.Bay(-4f, 12f, 0f, 3.4f, 6.6f);
+            Near(c, "#####T###");
+            IslandNear(c, "#####");
+            IslandFar(c, "#####");
+            Far(c, "#########");
         }
 
-        private static void PillarsAndPosts(Writer c)
+        private static void BothEnds(Writer c)
         {
-            c.Start(-14f, 4f);
+            LotStart(c, 8f);
 
-            Perimeter(c, 1.5f, 2.8f, 4.5f, -14f);
-
-            for (int row = 0; row < 4; row++)
-            {
-                c.Pillars(-15f, 10f + row * 10f, 15f, 10f + row * 10f, 6, 2.8f);
-            }
-
-            c.CarRow(-16f, 16f, 0f, 4, 3.1f);
-            c.CarRow(4f, 16f, 0f, 4, 3.1f);
-            c.CarRow(-16f, 34f, 0f, 3, 3.1f);
-            c.Car(6f, 35.5f, 180f, Car.Muscle);
-            c.Car(12.5f, 35.5f, 180f, Car.Sedan);
-
-            // Between two cars, clear of the back wall: at z=38 the bay ran into it.
-            c.Bay(9.3f, 35.5f, 180f, 2.9f, 6.3f);
+            Near(c, "T.#.#.#.#");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.#.#");
+            Far(c, "#.#.#.#.T");
         }
 
-        // Two decks: an entrance apron, a ramp down, and the lower level. Each lays its
-        // own floor, because one slab over the whole course would roof the lower deck in.
-        private static void DownTheRamp(Writer c)
+        private static void ThreeStops(Writer c)
         {
-            // The entrance is raised and the lower deck sits on the site, rather than the
-            // deck being sunk: the whole training site stands on seven metres of slab, so
-            // anything dug below its surface is inside solid concrete.
-            const float Entrance = 2.6f;
+            LotStart(c);
 
-            c.Level(Entrance);
-            c.Start(0f, 4f);
-
-            // Thick enough to reach the site surface it stands on.
-            c.PadAt(0f, 7f, 20f, 16f, Entrance + 0.5f);
-            c.Rail(0f, 7f, 20f, 16f, 11f);
-            c.Arrow(0f, 8f, 0f);
-
-            // Down to the lower deck. 16m of ramp for 2.6m of drop is about nine degrees:
-            // a WheelCollider climbs that cleanly and catches on much more.
-            c.Ramp(0f, 15f, 0f, 31f, 9f, -Entrance);
-
-            c.Level(0f);
-            c.PadAt(0f, 45f, 34f, 28f);
-
-            // Railed on three sides; the fourth is where the ramp arrives.
-            c.Wall(-17f, 31f, -17f, 59f, 2.8f);
-            c.Wall(17f, 31f, 17f, 59f, 2.8f);
-            c.Wall(-17f, 59f, 17f, 59f, 2.8f);
-            c.Wall(-17f, 31f, -5.1f, 31f, 2.8f);
-            c.Wall(5.1f, 31f, 17f, 31f, 2.8f);
-
-            c.Pillars(-10f, 38f, 10f, 38f, 3, 2.8f);
-            c.Pillars(-10f, 52f, 10f, 52f, 3, 2.8f);
-
-            c.CarRow(-14f, 47f, 0f, 3, 3.2f);
-            c.Prop(Part.Cone, 6f, 35f, 0f, 0.75f);
-
-            c.Bay(7f, 46f, 0f, 3.3f, 6.5f);
+            Near(c, "#.T.#.#.#");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.T.#");
+            Far(c, "#.#.#.#.T");
         }
 
-        private static void UpperDeck(Writer c)
+        private static void NoseOut(Writer c)
         {
-            c.Start(0f, 4f);
+            LotStart(c);
 
-            c.PadAt(0f, 8f, 22f, 18f);
-            c.Rail(0f, 8f, 22f, 18f, 11f);
-            c.Arrow(0f, 8f, 0f);
+            // The base row leaves its slot empty - a space, not an empty bay - so the
+            // turned bay is the only thing painted there and no car is parked in it.
+            Near(c, "#.#. .#.#");
+            c.BayRow(WideLeft, Row1, 0f, "    T    ");
 
-            // Up one level: 20m of ramp for 3.4m, just under ten degrees.
-            c.Ramp(0f, 17f, 0f, 37f, 9f, 3.4f);
-            c.Wall(-5.1f, 17f, -5.1f, 37f, 1.6f, 0.5f);
-            c.Wall(5.1f, 17f, 5.1f, 37f, 1.6f, 0.5f);
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.#.#");
 
-            c.Level(3.4f);
-            c.PadAt(0f, 51f, 38f, 28f);
-
-            // Parapet round the upper deck, open where the ramp arrives.
-            c.Wall(-19f, 37f, -19f, 65f, 1.3f);
-            c.Wall(19f, 37f, 19f, 65f, 1.3f);
-            c.Wall(-19f, 65f, 19f, 65f, 1.3f);
-            c.Wall(-19f, 37f, -5.1f, 37f, 1.3f);
-            c.Wall(5.1f, 37f, 19f, 37f, 1.3f);
-
-            c.Pillars(-12f, 44f, 12f, 44f, 4, 2.8f);
-            c.Pillars(-12f, 58f, 12f, 58f, 4, 2.8f);
-
-            c.CarRow(-16f, 52f, 0f, 4, 3.2f);
-            c.Car(5f, 60f, 0f, Car.Classic);
-            c.Car(11.5f, 60f, 0f, Car.Hatchback);
-
-            c.Bay(8.3f, 60f, 0f, 3.2f, 6.5f);
+            Far(c, "#. .#.#.#");
+            c.BayRow(WideLeft, Row4, 180f, "  T      ");
         }
 
-        private static void Rooftop(Writer c)
+        private static void AnyWayRound(Writer c)
         {
-            c.Start(0f, 4f);
+            LotStart(c);
 
-            c.PadAt(0f, 7f, 22f, 16f);
-            c.Rail(0f, 7f, 22f, 16f, 11f);
-            c.Arrow(0f, 8f, 0f);
-
-            // The building the roof deck sits on, and the ramp climbing its flank.
-            c.Block(0f, 52f, 0f, 38f, 3.7f, 32f);
-            c.Ramp(0f, 15f, 0f, 37f, 9f, 3.8f);
-            c.Wall(-5.1f, 15f, -5.1f, 37f, 1.6f, 0.5f);
-            c.Wall(5.1f, 15f, 5.1f, 37f, 1.6f, 0.5f);
-
-            c.Level(3.8f);
-            c.PadAt(0f, 52f, 36f, 30f);
-
-            // Parapet all the way round the roof, open where the ramp arrives.
-            c.Wall(-18f, 37f, -18f, 67f, 1.3f, 0.5f, Part.ConcreteYellow);
-            c.Wall(18f, 37f, 18f, 67f, 1.3f, 0.5f, Part.ConcreteYellow);
-            c.Wall(-18f, 67f, 18f, 67f, 1.3f, 0.5f, Part.ConcreteYellow);
-            c.Wall(-18f, 37f, -5.1f, 37f, 1.3f, 0.5f, Part.ConcreteYellow);
-            c.Wall(5.1f, 37f, 18f, 37f, 1.3f, 0.5f, Part.ConcreteYellow);
-
-            c.CarRow(-15f, 62f, 180f, 4, 3.2f);
-            c.Car(4f, 64f, 180f, Car.Muscle);
-            c.Car(10.5f, 64f, 180f, Car.Sedan);
-
-            c.Bay(7.3f, 64f, 180f, 3.0f, 6.4f);
+            // Three bays, none of them arrowed, so none of them care which way the car
+            // finishes facing.
+            Near(c, "#.t.#.#.#");
+            IslandFar(c, "#.t.#");
+            Far(c, "#.#.#.t.#");
         }
 
-        private static void DrivingTest(Writer c)
+        private static void ReadThePaint(Writer c)
         {
-            c.Start(0f, 4f);
+            LotStart(c, 10f);
 
-            c.Kerb(-8f, 6f, -8f, 30f);
-            c.Kerb(8f, 6f, 8f, 30f);
-            c.Slalom(10f, 28f, 3.2f, 4);
-
-            var sBend = new[]
-            {
-                new Vector2(0f, 32f),
-                new Vector2(0f, 40f),
-                new Vector2(8f, 48f),
-                new Vector2(8f, 56f),
-                new Vector2(0f, 64f)
-            };
-
-            Lane(c, sBend, 2.9f, false);
-
-            // Square corner out to the reversing bay.
-            Lane(c, new[] { new Vector2(0f, 64f), new Vector2(0f, 72f), new Vector2(14f, 72f) }, 2.9f, true);
-
-            c.Arrow(0f, 8f, 0f);
-            c.Barriers(-12f, 70f, -12f, 76f, 3);
-
-            // Clear of the lane wall that brackets the final corner at z=74.9.
-            c.Bay(14f, 79f, 180f, 2.9f, 6.3f);
+            Near(c, "#.T.#.t.#");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.#.#");
+            Far(c, "#.#.T.#.#");
         }
 
-        private static void Maze(Writer c)
+        private static void FullHouse(Writer c)
         {
-            c.Start(-20f, 4f);
+            LotStart(c);
 
-            Perimeter(c, 1.5f, 2.8f, 5f, -20f);
-
-            // Spine walls with gaps, giving lanes, dead ends and one way through.
-            c.Wall(-14f, 10f, 20f, 10f, 2.4f);
-            c.Wall(-24f, 18f, 8f, 18f, 2.4f);
-            c.Wall(-6f, 26f, 24f, 26f, 2.4f);
-            c.Wall(-24f, 34f, 10f, 34f, 2.4f);
-            c.Wall(-2f, 42f, 24f, 42f, 2.4f);
-
-            c.Wall(-14f, 10f, -14f, 18f, 2.4f);
-            c.Wall(8f, 18f, 8f, 26f, 2.4f);
-            c.Wall(-6f, 26f, -6f, 34f, 2.4f);
-            c.Wall(10f, 34f, 10f, 42f, 2.4f);
-
-            // Dead ends, so the route is not simply the only corridor.
-            c.Car(16f, 14f, 90f, Car.Sedan);
-            c.Car(-18f, 22f, 90f, Car.Hatchback);
-            c.Car(18f, 30f, 90f, Car.Muscle);
-
-            c.Barriers(-20f, 38f, -14f, 38f, 3);
-            c.Arrow(-20f, 7f, 0f);
-
-            c.Bay(-16f, 47f, 0f, 3.1f, 6.4f);
+            Near(c, "###T#####");
+            IslandNear(c, "##T##");
+            IslandFar(c, "#####");
+            Far(c, "####T####");
         }
 
-        private static void FinalExamination(Writer c)
+        private static void Gauntlet(Writer c)
         {
-            // Raised entrance, deck at site level - same reason as Down The Ramp.
-            const float Entrance = 2.4f;
+            LotStart(c, -12f);
 
-            c.Level(Entrance);
-            c.Start(0f, 4f);
+            Near(c, "#.#.T.#.#");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.T.#");
+            Far(c, "#.#.#.T.#");
 
-            c.PadAt(0f, 7f, 22f, 16f, Entrance + 0.5f);
-            c.Rail(0f, 7f, 22f, 16f, 11f);
-            c.Arrow(0f, 8f, 0f);
+            c.Cones(-6f, NearAisle + 3.5f, 10f, NearAisle + 3.5f, 6);
+            c.Prop(Part.Barrel, -2f, NearAisle - 3.3f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 2f, NearAisle - 3.3f, 0f, 1.1f);
+            c.Prop(Part.WaterBarricade, 6f, FarAisle + 3.5f, 0f, 1.1f);
+            c.Prop(Part.WaterBarricade, 9.5f, FarAisle + 3.5f, 0f, 1.1f);
+            c.Prop(Part.PedestrianBarrier, -9f, FarAisle - 3.5f, 0f, 1.1f);
+        }
 
-            c.Ramp(0f, 15f, 0f, 31f, 9f, -Entrance);
+        private static void FourCorners(Writer c)
+        {
+            LotStart(c);
 
-            c.Level(0f);
-            c.PadAt(0f, 52f, 44f, 44f);
+            Near(c, "T.#.#.#.T");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.#.#");
+            Far(c, "T.#.#.#.T");
+        }
 
-            c.Wall(-22f, 30f, -22f, 74f, 3f);
-            c.Wall(22f, 30f, 22f, 74f, 3f);
-            c.Wall(-22f, 74f, 22f, 74f, 3f);
-            c.Wall(-22f, 30f, -5.1f, 30f, 3f);
-            c.Wall(5.1f, 30f, 22f, 30f, 3f);
+        private static void RushHour(Writer c)
+        {
+            LotStart(c, 11f);
 
-            c.Pillars(-16f, 38f, 16f, 38f, 5, 2.8f);
-            c.Pillars(-16f, 52f, 16f, 52f, 5, 2.8f);
-            c.Pillars(-16f, 66f, 16f, 66f, 5, 2.8f);
+            Near(c, "##T###T##");
+            IslandNear(c, "#####");
+            IslandFar(c, "##T##");
+            Far(c, "###T#####");
+        }
 
-            c.CarRow(-19f, 44f, 0f, 3, 3.1f);
-            c.CarRow(8f, 44f, 0f, 3, 3.1f);
+        private static void ObstacleCourse(Writer c)
+        {
+            LotStart(c, -11f);
 
-            c.Cones(-6f, 34f, 6f, 34f, 5);
-            c.Barriers(-12f, 58f, -6f, 58f, 3);
+            Near(c, "#.T.#.#.T");
+            IslandNear(c, "#.#.#");
+            IslandFar(c, "#.T.#");
+            Far(c, "#.#.T.#.#");
 
-            // The last space: parallel, against the wall, with a car at each end and a
-            // metre at either end of the car. Nothing to spare, as advertised.
-            c.Car(18f, 56f, 0f, Car.Sedan);
-            c.Car(18f, 68f, 0f, Car.Hatchback);
-            c.Bay(18f, 62f, 0f, 2.8f, 6.8f);
+            c.Cones(-13f, NearAisle - 3.4f, -2f, NearAisle - 3.4f, 5);
+            c.Prop(Part.Barrel, 5f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 8.5f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Block(-11f, 22f, 0f, 1.6f, 1.2f, 6f, Part.ConcreteYellow);
+            c.Hedge(12.5f, 22f, 0f, 10f);
+            c.Prop(Part.Channelizing, 0f, FarAisle - 3.4f, 0f, 1.1f);
+            c.Prop(Part.Channelizing, 3.5f, FarAisle - 3.4f, 0f, 1.1f);
+            c.Prop(Part.PedestrianBarrier, -7f, FarAisle + 3.5f, 0f, 1.1f);
+        }
+
+        private static void FinalLot(Writer c)
+        {
+            LotStart(c);
+
+            Near(c, "##T##t###");
+            IslandNear(c, "#####");
+            IslandFar(c, "##T##");
+            Far(c, "####T####");
+
+            c.Prop(Part.Barrel, -9.5f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 9.5f, NearAisle + 3.4f, 0f, 1.1f);
+            c.Cones(-4f, FarAisle - 3.4f, 7f, FarAisle - 3.4f, 5);
+
+            // One car abandoned across the lane down the right of the island, because a
+            // full lot always has one. It leaves the lane down the left - the one the
+            // course records as a way through - clear.
+            c.Car(12.5f, 24f, 12f, Car.Muscle);
+        }
+
+        // ----- the walled yards ----------------------------------------------------------
+
+        private static void TheYard(Writer c)
+        {
+            YardStart(c);
+
+            YardNear(c, "#.#.#.#.#");
+            YardFar(c, "..#.T.#..");
+            YardLeft(c, "#...#");
+            YardRight(c, "#...#");
+        }
+
+        private static void CornerWork(Writer c)
+        {
+            YardStart(c, -4f);
+
+            YardNear(c, "T.#.#.#.#");
+            YardFar(c, "#.#.#.#.T");
+            YardLeft(c, "#.#.#");
+            YardRight(c, "#.#.#");
+        }
+
+        private static void RoundTheWalls(Writer c)
+        {
+            YardStart(c);
+
+            // One on each of three walls, so the car is turned through a right angle
+            // between every pair of them.
+            YardNear(c, "#.#.T.#.#");
+            YardFar(c, "#.#.#.#.#");
+            YardLeft(c, "#.T.#");
+            YardRight(c, "#.T.#");
+        }
+
+        private static void WalledIn(Writer c)
+        {
+            YardStart(c, -6f, 13f);
+
+            YardNear(c, "#.#.#.T.#");
+            YardFar(c, "#.T.#.#.#");
+            YardLeft(c, "#.#.#");
+            YardRight(c, "#.T.#");
+
+            // Across the middle of the yard, well clear of the loop round the outside of
+            // it, so the square becomes a circuit rather than an open floor.
+            c.WhiteBarriers(-5f, 19f, 5f, 19f, 4);
+            c.Prop(Part.Barrel, 0f, 15f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 0f, 23f, 0f, 1.1f);
+        }
+
+        private static void ClearingUp(Writer c)
+        {
+            YardStart(c, -6f, 13f);
+
+            YardNear(c, "#.T.#.#.#");
+            YardFar(c, "#.#.#.T.#");
+            YardLeft(c, "#.T.#");
+            YardRight(c, "#.T.#");
+
+            c.WhiteBarriers(-5f, 17f, 5f, 17f, 4);
+            c.WhiteBarriers(-5f, 22f, 5f, 22f, 4);
+            c.Cones(-6.5f, 19.5f, 6.5f, 19.5f, 5);
+            c.Prop(Part.Barrel, 7f, 13f, 0f, 1.1f);
+            c.Prop(Part.Barrel, -7f, 25f, 0f, 1.1f);
+        }
+
+        // ----- the fountain squares ------------------------------------------------------
+
+        private static void TheFountain(Writer c)
+        {
+            SquareStart(c);
+
+            c.Fountain(0f, 21f, 4f);
+
+            SquareNear(c, "#.#.#.#.#");
+            SquareFar(c, "..#.T.#..");
+            SquareLeft(c, "#..#");
+            SquareRight(c, "#..#");
+        }
+
+        private static void GardenSquare(Writer c)
+        {
+            SquareStart(c, -6f);
+
+            c.Fountain(0f, 21f, 4f);
+
+            SquareNear(c, "#.#.#.#.#");
+            SquareFar(c, "#.T.#.#.#");
+            SquareLeft(c, "#.T#");
+            SquareRight(c, "#..#");
+
+            c.Hedge(-6.5f, 21f, 0f, 7f);
+            c.Hedge(6.5f, 21f, 0f, 7f);
+        }
+
+        private static void ThePromenade(Writer c)
+        {
+            SquareStart(c, 6f);
+
+            c.Fountain(0f, 21f, 4.5f);
+
+            SquareNear(c, "#.#.#.T.#");
+            SquareFar(c, "#.#.T.#.#");
+            SquareLeft(c, "####");
+            SquareRight(c, "####");
+
+            c.Hedge(0f, 15f, 90f, 9f);
+            c.Prop(Part.Barrel, -6.5f, 27f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 6.5f, 16f, 0f, 1.1f);
+        }
+
+        private static void ParkLife(Writer c)
+        {
+            SquareStart(c, -7f);
+
+            c.Fountain(0f, 21f, 4f);
+
+            SquareNear(c, "#.T.#.#.#");
+            SquareFar(c, "#.#.#.T.#");
+            SquareLeft(c, "#.T#");
+            SquareRight(c, "####");
+
+            c.Hedge(-6.5f, 21f, 0f, 8f);
+            c.Hedge(6.5f, 21f, 0f, 8f);
+            c.Hedge(0f, 14f, 90f, 8f);
+            c.Cones(-5f, 28.5f, 5f, 28.5f, 4);
+        }
+
+        private static void NightShift(Writer c)
+        {
+            SquareStart(c, 7f);
+
+            c.Fountain(0f, 21f, 4f);
+
+            SquareNear(c, "#.T.#.T.#");
+            SquareFar(c, "#.#.T.#.#");
+            SquareLeft(c, "#T##");
+            SquareRight(c, "####");
+
+            c.Hedge(-6.5f, 21f, 0f, 8f);
+            c.Hedge(6.5f, 21f, 0f, 8f);
+            c.Prop(Part.Barrel, -12f, 8.5f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 12f, 8.5f, 0f, 1.1f);
+            c.Cones(-4f, 28f, 4f, 28f, 4);
+        }
+
+        // ----- the circuses ---------------------------------------------------------------
+        //
+        // Eight bays, written clockwise from the one furthest from the start.
+
+        private static void TheCircus(Writer c)
+        {
+            CircusStart(c);
+            Circus(c, "#T##.T##");
+        }
+
+        private static void FountainRing(Writer c)
+        {
+            CircusStart(c, -6f);
+            Circus(c, "T#T##T##");
+        }
+
+        private static void Carousel(Writer c)
+        {
+            CircusStart(c, 6f);
+
+            // Facing outward: every arrow points away from the fountain, so each one is
+            // reversed into off the ring.
+            Circus(c, "#T#T#T##", false);
+        }
+
+        private static void LastRing(Writer c)
+        {
+            CircusStart(c);
+            Circus(c, "T#t#T#T#");
+
+            c.Prop(Part.Barrel, -14f, 8f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 14f, 8f, 0f, 1.1f);
+            c.Cones(-15f, 40f, 15f, 40f, 6);
+        }
+
+        // ----- the crossroads --------------------------------------------------------------
+
+        private static void CrossroadsTwo(Writer c)
+        {
+            CrossStart(c);
+            Cross(c, 'T', '#', 'T', '#');
+
+            c.Prop(Part.Barrel, -8f, 24f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 8f, 6f, 0f, 1.1f);
+        }
+
+        private static void FourWays(Writer c)
+        {
+            CrossStart(c);
+            Cross(c, 'T', 'T', 'T', 'T');
+        }
+
+        private static void Compass(Writer c)
+        {
+            CrossStart(c, 10f);
+            Cross(c, 'T', 'T', 'T', 'T');
+
+            // In the diagonals, where nothing has to be driven.
+            c.Prop(Part.Barrel, -8f, 24f, 0f, 1.1f);
+            c.Prop(Part.Barrel, 8f, 24f, 0f, 1.1f);
+            c.Prop(Part.Barrel, -8f, 6f, 0f, 1.1f);
+            c.Cones(6f, 7f, 9f, 10f, 3);
+        }
+
+        // ----- the alleys -------------------------------------------------------------------
+
+        private static void TheAlley(Writer c)
+        {
+            AlleyStart(c);
+
+            AlleyLeft(c, "#..T..#...");
+            AlleyRight(c, "#.....#...");
+        }
+
+        private static void BothWalls(Writer c)
+        {
+            AlleyStart(c);
+
+            AlleyLeft(c, "#.#.T.#.#.");
+            AlleyRight(c, "#.#.#.T.#.");
+        }
+
+        private static void LongAlley(Writer c)
+        {
+            AlleyStart(c);
+
+            AlleyLeft(c, "#.#.#.#.T.");
+            AlleyRight(c, "#.#.#.#.#T");
+        }
+
+        private static void TightAlley(Writer c)
+        {
+            AlleyStart(c);
+
+            AlleyLeft(c, "###T######");
+            AlleyRight(c, "#####T##T#");
+        }
+
+        private static void TheRun(Writer c)
+        {
+            AlleyStart(c);
+
+            AlleyLeft(c, "#T##T#####");
+            AlleyRight(c, "###T###T##");
+
+            c.Cones(-5f, 16f, -5f, 24f, 4);
+            c.Prop(Part.Barrel, 4f, 31f, 0f, 1.1f);
         }
     }
 }
