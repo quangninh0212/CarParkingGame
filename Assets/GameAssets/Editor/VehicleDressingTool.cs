@@ -371,14 +371,26 @@ namespace CarParkingGame.EditorTools
                 points = car.gameObject.AddComponent<CarParkingGame.Vehicle.VehicleViewPoints>();
             }
 
-            // Checked by rendering what each car's driver actually sees; see
-            // VehicleViewShotTool. Lower than this and the view is the dashboard.
-            // Eye height is a fraction of the body height measured up from its floor, and
-            // 0.7 of it sat the driver level with the window line: the bonnet filled the
-            // bottom half of the screen and the road was barely visible. These cars have no
-            // interior to sit inside, so the seated view is really a view from the top of
-            // the windscreen, and it has to be high enough to see the road over the wing.
-            points.EditorSetFractions(-0.42f, 0.34f, 1.1f, -0.45f, 1f);
+            // A seat set by hand is left exactly as it was found. Where the driver sits is
+            // a matter of taste, and taste beats a default - but only if a rebuild does not
+            // quietly throw it away.
+            if (points.HandTuned)
+            {
+                Debug.Log($"[VehicleDressingTool] '{car.name}': seat is hand tuned, left alone.", car);
+                return;
+            }
+
+            // Where a driver's head would be: high in the cabin, a little behind its
+            // middle, on the driver's side. Checked by rendering what each of the cars
+            // actually sees from there; see VehicleViewShotTool.
+            //
+            // The two numbers only work together. At 0.7 up the body the eye sat on the
+            // window line and the bonnet filled half the screen. Raising it to 1.1 cleared
+            // the bonnet but put the eye above the roof, so moving back into the cabin from
+            // there only brought the roof into shot. 0.95 is inside the cabin and high in
+            // it, which is what makes 0.12 read as sitting in the car rather than riding
+            // along on top of it.
+            points.EditorSetFractions(-0.42f, 0.12f, 0.95f, -0.45f, 1f);
             points.Measure();
             EditorUtility.SetDirty(points);
 
@@ -684,6 +696,17 @@ namespace CarParkingGame.EditorTools
             var serialized = new SerializedObject(director);
             SetObject(serialized, "cameraTransform", legacyCamera.transform);
             SetObject(serialized, "legacyFollowCamera", legacyCamera);
+
+            // Written rather than left to the field's default. A default only applies to a
+            // component that does not exist yet, and this one is already in the scene with
+            // the last build's number serialised into it.
+            SerializedProperty pitch = serialized.FindProperty("seatedPitchDegrees");
+
+            if (pitch != null)
+            {
+                pitch.floatValue = 6f;
+            }
+
             serialized.ApplyModifiedProperties();
 
             Debug.Log($"[VehicleDressingTool] Camera director wired to '{legacyCamera.name}'.");

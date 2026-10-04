@@ -148,6 +148,13 @@ namespace CarParkingGame.Vehicle
 
         private void Measure(CarController car)
         {
+#if UNITY_EDITOR
+            // Read every frame in the editor, so dragging the seat numbers in the
+            // Inspector moves the view while the game is running. A cached value would
+            // mean stopping, changing, starting and judging from memory.
+            measuredCar = null;
+#endif
+
             if (measuredCar == car)
             {
                 return;

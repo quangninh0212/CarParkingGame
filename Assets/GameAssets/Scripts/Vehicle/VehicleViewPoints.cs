@@ -19,6 +19,11 @@ namespace CarParkingGame.Vehicle
         [SerializeField] private Vector3 rearViewLocalPosition;
         [SerializeField] private bool measured;
 
+        [Header("Hand tuning")]
+        [Tooltip("On, this car's seat has been set by hand and the dressing tool will leave it alone. " +
+                 "Turn it on before changing the fractions below, or the next rebuild overwrites them.")]
+        [SerializeField] private bool handTuned;
+
         [Header("Driver's seat")]
         [Tooltip("Fraction of the body's half width the driver sits off centre. Negative is left-hand drive.")]
         [SerializeField] private float seatSideFraction = -0.42f;
@@ -38,6 +43,7 @@ namespace CarParkingGame.Vehicle
 
         public Vector3 DriverEyeLocalPosition => driverEyeLocalPosition;
         public Vector3 RearViewLocalPosition => rearViewLocalPosition;
+        public bool HandTuned => handTuned;
 
         private void Awake()
         {
@@ -80,6 +86,21 @@ namespace CarParkingGame.Vehicle
         }
 
 #if UNITY_EDITOR
+        // Re-measures as the numbers are dragged in the Inspector, in play mode as well as
+        // out of it, so the seat can be set by eye against the actual view rather than by
+        // rebuilding and looking again.
+        private void OnValidate()
+        {
+            // Only when the body can actually be measured. OnValidate also fires part way
+            // through loading, when the renderers are not there yet, and Measure falls back
+            // to a hardcoded seat when it cannot see them - which would quietly overwrite a
+            // seat that was set by hand.
+            if (TryMeasureBodyBounds(transform, out _))
+            {
+                Measure();
+            }
+        }
+
         // Lets the view-capture tool sweep seat positions without a rebuild per value.
         public void EditorSetFractions(float side, float length, float height, float rearLength, float rearHeight)
         {
