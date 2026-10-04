@@ -166,7 +166,7 @@ namespace CarParkingGame.Progression
 
         public bool IsMissionUnlocked(int missionId)
         {
-            if (missionId == FirstMissionId)
+            if (MissionUnlocking.EveryMissionOpen || missionId == FirstMissionId)
             {
                 return true;
             }

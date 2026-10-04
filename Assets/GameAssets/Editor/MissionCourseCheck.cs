@@ -119,6 +119,86 @@ namespace CarParkingGame.EditorTools
             // the route - a course with corners will have walls across it - so only a
             // missing floor is reported, not an obstruction.
             CheckFloorAlong(id, start.position, bay, problems);
+
+            // And, where the course recorded the lane it wants driven, that a car actually
+            // fits down it.
+            CheckRoutes(mission, problems);
+        }
+
+        // Sweeps a car-width box along every route the course recorded.
+        //
+        // A corridor on an open pad cannot be checked by asking whether the bay is
+        // reachable: walk round the outside of a walled lane and it is. Checking the start
+        // and the bay alone passed four courses whose lane was sealed at a corner by its
+        // own wall, which is how two of them reached a player.
+        //
+        // The box is as wide as the car but only as long as it is wide. A full 5m car
+        // cannot be swung round a corner in a check like this without false alarms, and a
+        // short box is still far too big to pass through a wall - which is the fault being
+        // looked for.
+        private static void CheckRoutes(MissionAuthoring mission, List<string> problems)
+        {
+            var span = new Vector3(CarHalfExtents.x, CarHalfExtents.y, CarHalfExtents.x);
+
+            foreach (Transform route in mission.GetComponentsInChildren<Transform>(true))
+            {
+                if (!route.name.StartsWith("Route ") || route.childCount < 2)
+                {
+                    continue;
+                }
+
+                for (int leg = 0; leg < route.childCount - 1; leg++)
+                {
+                    Vector3 from = route.GetChild(leg).position;
+                    Vector3 to = route.GetChild(leg + 1).position;
+
+                    if (CheckLeg(mission.MissionId, route.name, from, to, span, problems))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        private static bool CheckLeg(int id, string route, Vector3 from, Vector3 to, Vector3 span,
+            List<string> problems)
+        {
+            Vector3 along = to - from;
+            along.y = 0f;
+
+            if (along.sqrMagnitude < 0.01f)
+            {
+                return false;
+            }
+
+            Quaternion facing = Quaternion.LookRotation(along.normalized, Vector3.up);
+            int steps = Mathf.Max(2, Mathf.CeilToInt(along.magnitude / 0.5f));
+
+            for (int i = 0; i <= steps; i++)
+            {
+                Vector3 at = Vector3.Lerp(from, to, i / (float)steps);
+
+                if (!Physics.Raycast(at + Vector3.up * 3f, Vector3.down, out RaycastHit floor, 16f))
+                {
+                    problems.Add($"Mission {id}: no floor under {route} at {at:0.0}.");
+                    return true;
+                }
+
+                Vector3 centre = floor.point + Vector3.up * (RideHeight + CarHalfExtents.y);
+
+                foreach (Collider collider in Physics.OverlapBox(centre, span, facing))
+                {
+                    if (collider.isTrigger || collider == floor.collider)
+                    {
+                        continue;
+                    }
+
+                    problems.Add($"Mission {id}: '{collider.name}' blocks {route} at {at:0.0} - the lane is sealed and the car cannot get through.");
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // Somewhere the car can physically be: floor underneath, and nothing solid filling

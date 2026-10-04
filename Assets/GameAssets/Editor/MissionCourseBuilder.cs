@@ -585,6 +585,7 @@ namespace CarParkingGame.EditorTools
             }
 
             private float level;
+            private int routes;
 
             public ParkingZone Zone { get; private set; }
             public Transform StartPoint { get; private set; }
@@ -735,7 +736,34 @@ namespace CarParkingGame.EditorTools
 
             public void Arrow(float x, float z, float yaw)
             {
-                kit.Spawn(MissionCourseKit.Part.ArrowLong, root, new Vector3(x, level + 0.06f, z), yaw, Vector3.zero);
+                kit.PaintArrow(root, new Vector3(x, level, z), yaw);
+            }
+
+            // Records a path the car has to be able to drive down, as empty transforms the
+            // scene keeps. The course checker sweeps a car along it afterwards.
+            //
+            // The checker reloads the scene and has no idea how a course was drawn, so it
+            // cannot tell a corridor from open tarmac. Without this it could only check
+            // that the start and the bay were clear, and it passed every one of the
+            // courses whose lane was walled shut at a corner.
+            public void Route(params Vector2[] path)
+            {
+                if (path == null || path.Length < 2)
+                {
+                    return;
+                }
+
+                var route = new GameObject("Route " + ++routes);
+                Undo.RegisterCreatedObjectUndo(route, "Record route");
+
+                route.transform.SetParent(root, false);
+
+                for (int i = 0; i < path.Length; i++)
+                {
+                    var point = new GameObject("Point " + i);
+                    point.transform.SetParent(route.transform, false);
+                    point.transform.localPosition = new Vector3(path[i].x, level, path[i].y);
+                }
             }
 
             public void Start(float x, float z, float yaw = 0f)

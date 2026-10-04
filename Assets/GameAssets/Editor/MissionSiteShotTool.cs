@@ -51,11 +51,26 @@ namespace CarParkingGame.EditorTools
 
             // One mission, rendered into the whole sheet, for looking at a course closely
             // rather than judging it from a thumbnail.
+            // A comma-separated list, so one sheet can hold the handful of courses being
+            // looked at rather than all thirty shrunk to thumbnails.
             string only = GetArg("-only");
 
-            if (!string.IsNullOrEmpty(only) && int.TryParse(only, out int onlyId))
+            if (!string.IsNullOrEmpty(only))
             {
-                missions.RemoveAll(mission => mission.MissionId != onlyId);
+                var wanted = new HashSet<int>();
+
+                foreach (string piece in only.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (int.TryParse(piece.Trim(), out int id))
+                    {
+                        wanted.Add(id);
+                    }
+                }
+
+                if (wanted.Count > 0)
+                {
+                    missions.RemoveAll(mission => !wanted.Contains(mission.MissionId));
+                }
             }
 
             if (missions.Count == 0)

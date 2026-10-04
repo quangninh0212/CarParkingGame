@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using CarParkingGame.Garage;
+using CarParkingGame.Progression;
 using CarParkingGame.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -188,7 +189,9 @@ namespace CarParkingGame.EditorTools
 
                 if (locked != null)
                 {
-                    locked.gameObject.SetActive(i > 5);
+                    // Asked the same way the real card asks, so the shot does not show a
+                    // row of padlocks the game will not show.
+                    locked.gameObject.SetActive(!MissionUnlocking.IsOpen(i + 1, null));
                 }
             }
         }

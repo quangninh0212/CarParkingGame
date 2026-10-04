@@ -99,6 +99,15 @@ namespace CarParkingGame.EditorTools
         // instead of carrying a y through every call.
         public float BaseY { get; set; }
 
+        // Road paint, so: wide and all but flat. A narrow strip standing 10cm proud is a
+        // kerb seen edge on from a driver's eye - all shadowed side, almost no top face -
+        // and it reads as a dark line rather than as paint.
+        private const float PaintThickness = 0.03f;
+        private const float PaintLift = 0.035f;
+
+        private static readonly Color Yellow = new Color(1f, 0.82f, 0.15f);
+        private static readonly Color White = new Color(0.93f, 0.95f, 0.98f);
+
         public GameObject Spawn(Part part, Transform parent, Vector3 localPosition, float yawDegrees, Vector3 size)
         {
             GameObject instance = SpawnPath(PartPaths[part], parent, localPosition, yawDegrees, size);
@@ -191,45 +200,84 @@ namespace CarParkingGame.EditorTools
         // heading check with nothing on screen to say why.
         public void PaintBay(Transform bay, float width, float length)
         {
-            // Road paint, so: wide and all but flat. A narrow strip standing 10cm proud is
-            // a kerb seen edge on from a driver's eye - all shadowed side, almost no top
-            // face - and it reads as a dark line rather than as paint.
             const float Paint = 0.32f;
-            const float Thickness = 0.03f;
-            const float Lift = 0.035f;
-            const float Stroke = 0.55f;
 
             float halfWidth = width * 0.5f;
             float halfLength = length * 0.5f;
 
-            PaintStroke(bay, new Vector3(-halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
-            PaintStroke(bay, new Vector3(halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
-            PaintStroke(bay, new Vector3(0f, Lift, halfLength), 0f, new Vector3(width, Thickness, Paint));
-            PaintStroke(bay, new Vector3(0f, Lift, -halfLength), 0f, new Vector3(width, Thickness, Paint));
+            PaintStroke(bay, new Vector3(-halfWidth, PaintLift, 0f), 0f, new Vector3(Paint, PaintThickness, length));
+            PaintStroke(bay, new Vector3(halfWidth, PaintLift, 0f), 0f, new Vector3(Paint, PaintThickness, length));
+            PaintStroke(bay, new Vector3(0f, PaintLift, halfLength), 0f, new Vector3(width, PaintThickness, Paint));
+            PaintStroke(bay, new Vector3(0f, PaintLift, -halfLength), 0f, new Vector3(width, PaintThickness, Paint));
 
-            float shaft = length * 0.5f;
-            float head = width * 0.42f;
+            // The arrow sits well inside the rectangle, so its tip does not run into the
+            // painted end of the bay.
+            PaintArrowHead(bay, length * 0.64f, width * 0.5f, 0.55f, Yellow);
+        }
 
-            PaintStroke(bay, new Vector3(0f, Lift, -length * 0.08f), 0f, new Vector3(Stroke, Thickness, shaft));
+        // A lane arrow painted on the road, pointing along the parent's +Z: the same flat
+        // strokes as a bay's arrow, in white so it reads as a direction marking rather
+        // than as part of a bay.
+        //
+        // This was the track pack's own arrow prop until a player reported the marking at
+        // the start of a course "floating above the ground". That prop is a solid board,
+        // not a decal, so laying it on the tarmac leaves a plank across the lane with a
+        // shadow under it - nothing like paint.
+        public void PaintArrow(Transform parent, Vector3 localPosition, float yawDegrees,
+                               float length = 4.2f, float width = 1.5f)
+        {
+            var arrow = new GameObject("LaneArrow");
+            Undo.RegisterCreatedObjectUndo(arrow, "Paint lane arrow");
 
-            var tip = new Vector3(0f, Lift, shaft * 0.5f - length * 0.08f);
+            arrow.transform.SetParent(parent, false);
+            arrow.transform.localPosition = localPosition;
+            arrow.transform.localRotation = Quaternion.Euler(0f, yawDegrees, 0f);
+
+            PaintArrowHead(arrow.transform, length, width, 0.4f, White);
+        }
+
+        // The shaft and the two splayed bars of an arrow, drawn around the parent's origin
+        // and pointing along its +Z, so a bay's arrow and a lane's arrow are the same
+        // drawing at two sizes.
+        private void PaintArrowHead(Transform parent, float length, float width, float stroke, Color colour)
+        {
+            const float Spread = 38f * Mathf.Deg2Rad;
+
+            // How far back the head reaches, so the shaft can stop where the bars start
+            // instead of poking out past the tip.
+            float bar = width / (2f * Mathf.Sin(Spread));
+            float depth = bar * Mathf.Cos(Spread);
+
+            float tipZ = length * 0.5f;
+            float shaft = Mathf.Max(stroke, length - depth);
+
+            PaintStroke(parent, new Vector3(0f, PaintLift, tipZ - depth - shaft * 0.5f), 0f,
+                new Vector3(stroke, PaintThickness, shaft), colour);
 
             for (int side = -1; side <= 1; side += 2)
             {
-                const float Spread = 38f * Mathf.Deg2Rad;
                 var direction = new Vector2(side * Mathf.Sin(Spread), -Mathf.Cos(Spread));
 
-                Vector3 centre = tip + new Vector3(direction.x, 0f, direction.y) * (head * 0.5f);
+                var centre = new Vector3(direction.x, 0f, direction.y) * (bar * 0.5f)
+                    + new Vector3(0f, PaintLift, tipZ);
                 float yaw = Mathf.Atan2(direction.x, direction.y) * Mathf.Rad2Deg;
 
-                PaintStroke(bay, centre, yaw, new Vector3(Stroke, Thickness, head));
+                PaintStroke(parent, centre, yaw, new Vector3(stroke, PaintThickness, bar), colour);
             }
         }
 
         private void PaintStroke(Transform bay, Vector3 position, float yaw, Vector3 size)
         {
-            GameObject stroke = Spawn(Part.Plate, bay, position, yaw, size);
-            Tint(stroke, "CourseBayPaint", new Color(1f, 0.82f, 0.15f), true);
+            PaintStroke(bay, position, yaw, size, Yellow);
+        }
+
+        private void PaintStroke(Transform parent, Vector3 position, float yaw, Vector3 size, Color colour)
+        {
+            GameObject stroke = Spawn(Part.Plate, parent, position, yaw, size);
+
+            // Self-lit, because flat paint on a dark pad under this scene's lighting
+            // renders near black whatever colour it is given.
+            Tint(stroke, colour == White ? "CourseLanePaint" : "CourseBayPaint", colour, true);
         }
 
         public void Kerb(Transform parent, Vector2 from, Vector2 to, float width = 0.5f)

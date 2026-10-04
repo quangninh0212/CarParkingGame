@@ -302,24 +302,79 @@ namespace CarParkingGame.EditorTools
         // is. The path is a centre line; the edges are offset perpendicular to each leg.
         private static void Lane(Writer c, Vector2[] path, float halfWidth, bool walls, float wallHeight = 2.2f)
         {
-            for (int i = 0; i < path.Length - 1; i++)
-            {
-                Vector2 from = path[i];
-                Vector2 to = path[i + 1];
-                Vector2 side = Perpendicular(to - from) * halfWidth;
+            c.Route(path);
 
-                if (walls)
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Vector2[] edge = OffsetPath(path, side * halfWidth);
+
+                for (int i = 0; i < edge.Length - 1; i++)
                 {
-                    c.Wall(from.x + side.x, from.y + side.y, to.x + side.x, to.y + side.y, wallHeight);
-                    c.Wall(from.x - side.x, from.y - side.y, to.x - side.x, to.y - side.y, wallHeight);
-                }
-                else
-                {
-                    int count = Mathf.Max(2, Mathf.RoundToInt((to - from).magnitude / 3f));
-                    c.Cones(from.x + side.x, from.y + side.y, to.x + side.x, to.y + side.y, count);
-                    c.Cones(from.x - side.x, from.y - side.y, to.x - side.x, to.y - side.y, count);
+                    Vector2 from = edge[i];
+                    Vector2 to = edge[i + 1];
+
+                    if (walls)
+                    {
+                        c.Wall(from.x, from.y, to.x, to.y, wallHeight);
+                    }
+                    else
+                    {
+                        int count = Mathf.Max(2, Mathf.RoundToInt((to - from).magnitude / 3f));
+                        c.Cones(from.x, from.y, to.x, to.y, count);
+                    }
                 }
             }
+        }
+
+        // One side of a lane: the centre line walked at a fixed distance, meeting each
+        // corner where the two offset legs cross rather than where the centre line turns.
+        //
+        // Offsetting each leg on its own is what put a wall across the L bend. The inside
+        // edge of the leg after a square corner starts half a lane short of the corner, so
+        // on its own it runs straight across the leg before it and seals the lane - the
+        // wall "sticking out so the car cannot get past" in the report.
+        private static Vector2[] OffsetPath(Vector2[] path, float distance)
+        {
+            var edge = new Vector2[path.Length];
+            int last = path.Length - 1;
+
+            edge[0] = path[0] + Perpendicular(path[1] - path[0]) * distance;
+            edge[last] = path[last] + Perpendicular(path[last] - path[last - 1]) * distance;
+
+            for (int i = 1; i < last; i++)
+            {
+                Vector2 incoming = (path[i] - path[i - 1]).normalized;
+                Vector2 outgoing = (path[i + 1] - path[i]).normalized;
+
+                Vector2 onIncoming = path[i] + Perpendicular(incoming) * distance;
+                Vector2 onOutgoing = path[i] + Perpendicular(outgoing) * distance;
+
+                // Parallel legs, or a reversal: there is no crossing point, and the offset
+                // simply carries straight on.
+                if (!TryCross(onIncoming, incoming, onOutgoing, outgoing, out edge[i]))
+                {
+                    edge[i] = onIncoming;
+                }
+            }
+
+            return edge;
+        }
+
+        private static bool TryCross(Vector2 a, Vector2 alongA, Vector2 b, Vector2 alongB, out Vector2 point)
+        {
+            float denominator = alongA.x * alongB.y - alongA.y * alongB.x;
+
+            if (Mathf.Abs(denominator) < 1e-4f)
+            {
+                point = a;
+                return false;
+            }
+
+            Vector2 delta = b - a;
+            float distance = (delta.x * alongB.y - delta.y * alongB.x) / denominator;
+
+            point = a + alongA * distance;
+            return true;
         }
 
         private static Vector2 Perpendicular(Vector2 direction)
@@ -414,16 +469,21 @@ namespace CarParkingGame.EditorTools
         {
             c.Start(0f, 3f);
 
+            c.Route(new Vector2(0f, 3f), new Vector2(0f, 44f), new Vector2(0f, 48f));
+
             // 3.9m between the walls for a 1.95m car: under a metre each side.
-            c.Wall(-1.95f, 6f, -1.95f, 40f, 2.4f);
-            c.Wall(1.95f, 6f, 1.95f, 40f, 2.4f);
+            c.Wall(-1.95f, 6f, -1.95f, 42f, 2.4f);
+            c.Wall(1.95f, 6f, 1.95f, 42f, 2.4f);
 
             c.Cones(-3.2f, 4f, -3.2f, 5.5f, 2);
             c.Cones(3.2f, 4f, 3.2f, 5.5f, 2);
             c.Arrow(0f, 9f, 0f);
 
-            // Opens into a small yard at the far end.
-            c.Wall(-8f, 42f, 8f, 42f, 2.4f);
+            // Opens into a small yard at the far end. The yard's near wall has to be two
+            // walls with the lane's own width between them, or it seals off the only room
+            // the course has to park in.
+            c.Wall(-8f, 42f, -1.95f, 42f, 2.4f);
+            c.Wall(1.95f, 42f, 8f, 42f, 2.4f);
             c.Wall(-8f, 42f, -8f, 54f, 2.4f);
             c.Wall(8f, 42f, 8f, 54f, 2.4f);
             c.Wall(-8f, 54f, 8f, 54f, 2.4f);
@@ -480,6 +540,13 @@ namespace CarParkingGame.EditorTools
             // The store across the back.
             c.Block(0f, 46f, 0f, 44f, 7f, 8f);
 
+            // The rows leave a cross aisle in the middle, from x = -3.8 to x = 3, and that
+            // aisle is the only way to the back of the car park. The row kerbs have to stop
+            // either side of it - run across it and the course is sealed at the first row,
+            // with every space beyond it unreachable.
+            const float AisleLeft = -4.5f;
+            const float AisleRight = 3.5f;
+
             // Three rows of bays, nose to nose, with aisles between them.
             for (int row = 0; row < 3; row++)
             {
@@ -488,9 +555,16 @@ namespace CarParkingGame.EditorTools
                 c.CarRow(-24f, z, 0f, 7, 3.2f);
                 c.CarRow(4f, z, 0f, 6, 3.2f);
 
-                c.Kerb(-26f, z + 3.4f, 26f, z + 3.4f);
-                c.Arrow(-20f, z + 6.5f, 90f);
+                c.Kerb(-26f, z + 3.4f, AisleLeft, z + 3.4f);
+                c.Kerb(AisleRight, z + 3.4f, 26f, z + 3.4f);
             }
+
+            // Along the front of the first row and up the cross aisle: the way in, which
+            // is not obvious from the driver's seat with a row of cars across the view.
+            c.Route(new Vector2(-20f, 6f), new Vector2(-0.4f, 6f), new Vector2(-0.4f, 27f));
+
+            c.Arrow(-12f, 6.5f, 90f);
+            c.Arrow(-0.4f, 13f, 0f);
 
             // Trolley shelters.
             c.Block(20f, 20f, 0f, 3f, 2.6f, 7f, Part.ConcreteYellow);
@@ -504,6 +578,11 @@ namespace CarParkingGame.EditorTools
         {
             c.Start(-18f, 4f);
 
+            // As in the supermarket: the cross aisle between the two blocks of each row is
+            // the only route to the back, so the kerbs stop either side of it.
+            const float AisleLeft = -6f;
+            const float AisleRight = 1.5f;
+
             for (int row = 0; row < 4; row++)
             {
                 float z = 12f + row * 11f;
@@ -511,20 +590,26 @@ namespace CarParkingGame.EditorTools
                 c.CarRow(-22f, z, 0f, 6, 3.1f);
                 c.CarRow(2f, z, 0f, 6, 3.1f);
 
-                c.Kerb(-24f, z + 3.2f, 24f, z + 3.2f);
+                c.Kerb(-24f, z + 3.2f, AisleLeft, z + 3.2f);
+                c.Kerb(AisleRight, z + 3.2f, 24f, z + 3.2f);
             }
+
+            c.Route(new Vector2(-18f, 6f), new Vector2(-2.25f, 6f), new Vector2(-2.25f, 45f));
 
             c.Wall(-25f, 2f, -25f, 50f, 2.2f);
             c.Wall(25f, 2f, 25f, 50f, 2.2f);
             c.Wall(-25f, 50f, 25f, 50f, 2.2f);
 
-            c.Arrow(-18f, 9f, 0f);
+            c.Arrow(-10f, 6.5f, 90f);
+            c.Arrow(-2.25f, 12f, 0f);
 
             // Deep inside, on the back row, with a car either side. The bay faces back
             // down the aisle: this is a reverse mission, so the nose ends up pointing out.
+            //
+            // Only the left-hand car is placed here. The right-hand one is already in the
+            // back row - a second car on the same spot was two cars inside each other.
             c.Bay(-1.5f, 45f, 180f, 3.0f, 6.3f);
             c.Car(-5f, 45f, 0f, Car.Sedan);
-            c.Car(2f, 45f, 0f, Car.Hatchback);
         }
 
         private static void PetrolStation(Writer c)

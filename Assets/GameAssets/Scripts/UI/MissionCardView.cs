@@ -38,8 +38,7 @@ namespace CarParkingGame.UI
             missionId = definition.MissionId;
             selectedCallback = onSelected;
 
-            bool unlocked = definition.MissionId == SaveData.FirstMissionId
-                || (progress != null && progress.unlocked);
+            bool unlocked = MissionUnlocking.IsOpen(definition.MissionId, progress);
 
             int stars = progress != null ? progress.bestStars : 0;
             int bestScore = progress != null ? progress.bestScore : 0;

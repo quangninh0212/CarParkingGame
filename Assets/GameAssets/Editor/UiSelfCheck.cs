@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using CarParkingGame.Core;
 using CarParkingGame.Garage;
 using CarParkingGame.Missions;
+using CarParkingGame.Progression;
 using CarParkingGame.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -78,6 +79,7 @@ namespace CarParkingGame.EditorTools
             CheckLegacyUiIsOff(problems);
             CheckScreensAreExclusive(problems);
             CheckGarageIsLive(problems);
+            CheckPracticeGate(problems);
 
             return problems;
         }
@@ -152,6 +154,63 @@ namespace CarParkingGame.EditorTools
 
         // The overlapping screens in the bug report were two live canvases, not a layout
         // mistake, so this is checked rather than eyeballed.
+        // What a new player can actually tap in Practice, worked out the way the mission
+        // card works it out rather than the way the screenshot tool pretends.
+        //
+        // MissionUnlocking.EveryMissionOpen is a switch, so this checks the behaviour the
+        // switch is currently set to: every course open while the courses are being
+        // reviewed, or mission one alone on a fresh save once it goes back.
+        private static void CheckPracticeGate(List<string> problems)
+        {
+            var manager = Object.FindFirstObjectByType<MissionManager>(FindObjectsInactive.Include);
+
+            if (manager == null)
+            {
+                problems.Add("No MissionManager in the scene, so nothing can be selected in Practice.");
+                return;
+            }
+
+            manager.RebuildRegistry();
+
+            int open = 0;
+            var shut = new List<int>();
+
+            foreach (MissionAuthoring mission in manager.RegisteredMissions)
+            {
+                // A fresh save: nothing completed, so no progress entry for any of them.
+                if (MissionUnlocking.IsOpen(mission.MissionId, null))
+                {
+                    open++;
+                }
+                else
+                {
+                    shut.Add(mission.MissionId);
+                }
+            }
+
+            int total = manager.RegisteredMissions.Count;
+
+            if (MissionUnlocking.EveryMissionOpen)
+            {
+                if (open != total)
+                {
+                    problems.Add($"Practice is meant to be wide open, but {shut.Count} of {total} missions are still locked ({string.Join(", ", shut)}).");
+                    return;
+                }
+
+                Debug.Log($"[UiSelfCheck] Practice is open: all {total} missions can be picked without playing through.");
+                return;
+            }
+
+            if (open != 1)
+            {
+                problems.Add($"Sequential unlocking is back on, but {open} missions are open on a fresh save instead of just the first.");
+                return;
+            }
+
+            Debug.Log($"[UiSelfCheck] Practice unlocks in order: 1 of {total} missions open on a fresh save.");
+        }
+
         private static void CheckLegacyUiIsOff(List<string> problems)
         {
             foreach (string name in new[] { "MainMenuCanvas", "MissionInfo", "MobileControls" })
