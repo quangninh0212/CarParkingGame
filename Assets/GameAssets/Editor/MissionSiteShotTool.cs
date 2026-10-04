@@ -106,7 +106,22 @@ namespace CarParkingGame.EditorTools
 
                 camera.orthographicSize = frame * 0.5f;
 
-                Color[] pixels = Render(camera, target, tile);
+                // What the player actually sees on the first frame of the level, which is
+                // the only view that answers "can they tell where to go".
+                Color[] pixels;
+
+                if (GetArg("-fromStart") != null && mission.StartPoint != null)
+                {
+                    pixels = RenderFromStart(camera, mission.StartPoint, tile);
+                }
+                else if (GetArg("-atBay") != null)
+                {
+                    pixels = RenderAtBay(camera, zone, tile);
+                }
+                else
+                {
+                    pixels = Render(camera, target, tile);
+                }
 
                 int column = i % columns;
 
@@ -178,6 +193,46 @@ namespace CarParkingGame.EditorTools
         private static float PitchDegrees =>
             float.TryParse(GetArg("-pitch"), out float pitch) ? pitch : 90f;
 
+        // Close in on the bay from where a car would approach it, which is the view that
+        // says whether the painted rectangle and its direction arrow actually read.
+        private static Color[] RenderAtBay(Camera camera, ParkingZone zone, int size)
+        {
+            bool wasOrthographic = camera.orthographic;
+
+            camera.orthographic = false;
+            camera.fieldOfView = 55f;
+            camera.nearClipPlane = 0.3f;
+
+            Vector3 approach = -zone.ParkedHeading;
+            Vector3 eye = zone.WorldCenter + approach * 13f + Vector3.up * 6f;
+
+            camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(zone.WorldCenter - eye, Vector3.up));
+
+            Color[] pixels = Capture(camera, size);
+
+            camera.orthographic = wasOrthographic;
+            return pixels;
+        }
+
+        // Roughly where the follow camera sits behind the car at the start line.
+        private static Color[] RenderFromStart(Camera camera, Transform start, int size)
+        {
+            bool wasOrthographic = camera.orthographic;
+
+            camera.orthographic = false;
+            camera.fieldOfView = 60f;
+            camera.nearClipPlane = 0.3f;
+
+            camera.transform.SetPositionAndRotation(
+                start.position + Vector3.up * 5f - start.forward * 9f,
+                Quaternion.LookRotation(start.forward + Vector3.down * 0.32f, Vector3.up));
+
+            Color[] pixels = Capture(camera, size);
+
+            camera.orthographic = wasOrthographic;
+            return pixels;
+        }
+
         private static Color[] Render(Camera camera, Vector3 target, int size)
         {
             float pitch = PitchDegrees;
@@ -191,6 +246,11 @@ namespace CarParkingGame.EditorTools
 
             camera.transform.SetPositionAndRotation(position, rotation);
 
+            return Capture(camera, size);
+        }
+
+        private static Color[] Capture(Camera camera, int size)
+        {
             var buffer = new RenderTexture(size, size, 24, RenderTextureFormat.ARGB32);
             RenderTexture previousActive = RenderTexture.active;
 

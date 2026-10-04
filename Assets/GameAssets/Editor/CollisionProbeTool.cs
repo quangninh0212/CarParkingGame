@@ -33,7 +33,7 @@ namespace CarParkingGame.EditorTools
             ProbeCars();
             ProbeProps();
 
-            int failures = VerifyContact();
+            int failures = VerifyContact() + VerifyMissionFloors();
 
             Debug.Log(failures == 0
                 ? "[CollisionProbeTool] Every car makes contact with every kind of prop it should."
@@ -241,6 +241,60 @@ namespace CarParkingGame.EditorTools
             }
 
             return failures;
+        }
+
+        // Every mission's start point and bay must have solid ground under them.
+        //
+        // Mission 9 dropped the car through the world the moment it loaded, because the
+        // course pads were spawned from the kit's flat-marking part and the kit strips
+        // colliders from markings. Nothing in the build caught it: the course was built
+        // correctly, looked correct from above, and had no floor.
+        private static int VerifyMissionFloors()
+        {
+            var manager = Object.FindFirstObjectByType<MissionManager>(FindObjectsInactive.Include);
+
+            if (manager == null)
+            {
+                return 0;
+            }
+
+            manager.RebuildRegistry();
+
+            foreach (MissionAuthoring mission in manager.RegisteredMissions)
+            {
+                mission.SetEnvironmentActive(true);
+            }
+
+            Physics.SyncTransforms();
+
+            int failures = 0;
+
+            foreach (MissionAuthoring mission in manager.RegisteredMissions)
+            {
+                if (mission.StartPoint != null && !HasFloorUnder(mission.StartPoint.position))
+                {
+                    Debug.LogError($"[CollisionProbeTool] Mission {mission.MissionId}: nothing solid under the start point - the car will fall through.");
+                    failures++;
+                }
+
+                if (mission.ParkingZone != null && !HasFloorUnder(mission.ParkingZone.WorldCenter + Vector3.up))
+                {
+                    Debug.LogError($"[CollisionProbeTool] Mission {mission.MissionId}: nothing solid under the parking bay.");
+                    failures++;
+                }
+            }
+
+            if (failures == 0)
+            {
+                Debug.Log($"[CollisionProbeTool] All {manager.RegisteredMissions.Count} missions have solid ground under their start point and bay.");
+            }
+
+            return failures;
+        }
+
+        private static bool HasFloorUnder(Vector3 at)
+        {
+            return Physics.Raycast(at + Vector3.up * 2f, Vector3.down, 12f);
         }
 
         private static float GroundLine(CarController car)

@@ -216,7 +216,7 @@ namespace CarParkingGame.UI
 
             if (validator.LastHeadingError > 20f)
             {
-                return "Straighten up";
+                return "Line the car up with the arrow";
             }
 
             if (validator.LastSpeedKmh > 3f)

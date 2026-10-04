@@ -364,6 +364,11 @@ namespace CarParkingGame.EditorTools
             SetPrivate(guide, "distanceLabel", distance);
             SetPrivate(guide, "worldCamera", Camera.main);
 
+            // Shown in every mode, not just challenge: a player dropped at the start of a
+            // practice course has no more idea where the bay is than one halfway round a
+            // challenge run.
+            SetPrivate(guide, "challengeOnly", false);
+
             arrow.SetActive(false);
         }
 

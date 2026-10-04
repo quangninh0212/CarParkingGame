@@ -368,7 +368,7 @@ namespace CarParkingGame.EditorTools
             // wherever the terrain falls away.
             const float thickness = 7f;
 
-            GameObject slab = kit.Spawn(MissionCourseKit.Part.Plate, apron.transform,
+            GameObject slab = kit.Spawn(MissionCourseKit.Part.Concrete, apron.transform,
                 new Vector3(0f, -thickness * 0.5f, 0f), 0f,
                 new Vector3(used.size.x + ApronMargin * 2f, thickness, used.size.z + ApronMargin * 2f));
 
@@ -394,13 +394,18 @@ namespace CarParkingGame.EditorTools
                 course.description,
                 course.difficulty,
                 course.parkingType,
+                // Untimed in practice; challenge mode brings its own clock.
                 0f,
                 true,
                 2f,
-                15f,
+                20f,
                 1.5f,
                 0.9f,
-                true,
+
+                // The heading is enforced rather than allowed either way round, because the
+                // bay now has an arrow painted in it saying which way to face. Twenty degrees
+                // of tolerance keeps it fair.
+                false,
                 200 + course.difficulty * 100,
                 rules != null ? rules.objectReferenceValue as ScoreRules : null);
 
@@ -573,9 +578,13 @@ namespace CarParkingGame.EditorTools
                 PadAt(0f, course.length * 0.5f, course.width, course.length, groundDrop + 0.5f);
             }
 
+            // Cast from the solid block, not from the flat marking part: the kit strips
+            // colliders from markings, because a painted line the car bumps into is worse
+            // than no line. Spawned as a marking the pad had no collider at all and the
+            // car dropped straight through the floor of the course.
             public void PadAt(float x, float z, float width, float length, float thickness = 0.5f)
             {
-                GameObject pad = kit.Spawn(MissionCourseKit.Part.Plate, root,
+                GameObject pad = kit.Spawn(MissionCourseKit.Part.Concrete, root,
                     new Vector3(x, level + 0.02f - thickness * 0.5f, z), 0f,
                     new Vector3(width, thickness, length));
 
@@ -673,6 +682,61 @@ namespace CarParkingGame.EditorTools
                 StartPoint = startPoint.transform;
             }
 
+            // The bay as the player sees it: a closed rectangle with an arrow inside it
+            // pointing the way the car's nose has to end up.
+            //
+            // Three sides and no arrow was not enough to play with - there is no way to
+            // tell from inside the car whether a bay wants you nose in or tail in, and
+            // guessing wrong fails the heading check with nothing on screen to say why.
+            private void PaintBay(Transform bay, float width, float length)
+            {
+                // Road paint, so: wide and all but flat. Earlier it was a 22cm strip standing
+                // 10cm proud, which from a driver's eye is a kerb seen edge on - all
+                // shadowed side and almost no top face, and it read as a dark line.
+                const float Paint = 0.32f;
+                const float Thickness = 0.03f;
+                const float Lift = 0.035f;
+
+                float halfWidth = width * 0.5f;
+                float halfLength = length * 0.5f;
+
+                PaintStroke(bay, new Vector3(-halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
+
+                PaintStroke(bay, new Vector3(halfWidth, Lift, 0f), 0f, new Vector3(Paint, Thickness, length));
+                PaintStroke(bay, new Vector3(0f, Lift, halfLength), 0f, new Vector3(width, Thickness, Paint));
+                PaintStroke(bay, new Vector3(0f, Lift, -halfLength), 0f, new Vector3(width, Thickness, Paint));
+
+                // The arrow runs up the middle towards the bay's own forward axis, which
+                // is the heading the parking validator measures against.
+                float shaft = length * 0.5f;
+                float head = width * 0.42f;
+                const float Stroke = 0.55f;
+
+                PaintStroke(bay, new Vector3(0f, Lift, -length * 0.08f), 0f, new Vector3(Stroke, Thickness, shaft));
+
+                var tip = new Vector3(0f, Lift, shaft * 0.5f - length * 0.08f);
+
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    const float Spread = 38f * Mathf.Deg2Rad;
+                    var direction = new Vector2(side * Mathf.Sin(Spread), -Mathf.Cos(Spread));
+
+                    Vector3 centre = tip + new Vector3(direction.x, 0f, direction.y) * (head * 0.5f);
+                    float yaw = Mathf.Atan2(direction.x, direction.y) * Mathf.Rad2Deg;
+
+                    PaintStroke(bay, centre, yaw, new Vector3(Stroke, Thickness, head));
+                }
+            }
+
+            // One stroke of bay paint. Cast from the plain block and coloured flat, because
+            // the striped marking prefab is a short bar: stretched to the length of a bay
+            // its stripes smear out and the line disappears.
+            private void PaintStroke(Transform bay, Vector3 position, float yaw, Vector3 size)
+            {
+                GameObject stroke = kit.Spawn(MissionCourseKit.Part.Plate, bay, position, yaw, size);
+                MissionCourseKit.Tint(stroke, "CourseBayPaint", new Color(1f, 0.82f, 0.15f), true);
+            }
+
             public Transform DefaultStart()
             {
                 Start(0f, 3f);
@@ -692,17 +756,7 @@ namespace CarParkingGame.EditorTools
                 zone.EditorSetBox(Vector3.zero, new Vector3(width, 2.5f, length));
                 zone.EditorSetParkedFacingBackward(false);
 
-                // Painted outline: two side lines and one end line, flush with the floor.
-                const float paint = 0.22f;
-
-                kit.Spawn(MissionCourseKit.Part.PlateYellow, bayObject.transform,
-                    new Vector3(-width * 0.5f, 0.05f, 0f), 0f, new Vector3(paint, 0.1f, length));
-
-                kit.Spawn(MissionCourseKit.Part.PlateYellow, bayObject.transform,
-                    new Vector3(width * 0.5f, 0.05f, 0f), 0f, new Vector3(paint, 0.1f, length));
-
-                kit.Spawn(MissionCourseKit.Part.PlateYellow, bayObject.transform,
-                    new Vector3(0f, 0.05f, length * 0.5f), 0f, new Vector3(width, 0.1f, paint));
+                PaintBay(bayObject.transform, width, length);
 
                 Zone = zone;
             }

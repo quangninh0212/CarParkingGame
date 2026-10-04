@@ -20,9 +20,9 @@ MonoBehaviour:
   timeLimitSeconds: 0
   failOnTimeout: 1
   maxParkingSpeedKmh: 2
-  angleToleranceDegrees: 15
+  angleToleranceDegrees: 20
   holdSeconds: 1.5
   requiredContainment: 0.9
-  allowOppositeHeading: 1
+  allowOppositeHeading: 0
   coinReward: 600
   scoreRules: {fileID: 11400000, guid: a621d531709d95847b5a8ba23bfe33b5, type: 2}

@@ -508,8 +508,9 @@ namespace CarParkingGame.EditorTools
 
             c.Arrow(-18f, 9f, 0f);
 
-            // Deep inside, on the back row, with a car either side.
-            c.Bay(-1.5f, 45f, 0f, 3.0f, 6.3f);
+            // Deep inside, on the back row, with a car either side. The bay faces back
+            // down the aisle: this is a reverse mission, so the nose ends up pointing out.
+            c.Bay(-1.5f, 45f, 180f, 3.0f, 6.3f);
             c.Car(-5f, 45f, 0f, Car.Sedan);
             c.Car(2f, 45f, 0f, Car.Hatchback);
         }
@@ -592,8 +593,9 @@ namespace CarParkingGame.EditorTools
 
             c.Arrow(-14f, 10f, 0f);
 
-            // The gap between the two coaches, reversed into.
-            c.Bay(0f, 34f, 0f, 3.1f, 6.6f);
+            // The gap between the two coaches, reversed into, so the nose ends up facing
+            // back out of the stand.
+            c.Bay(0f, 34f, 180f, 3.1f, 6.6f);
         }
 
         private static void LoadingYard(Writer c)
@@ -618,7 +620,8 @@ namespace CarParkingGame.EditorTools
             c.Barriers(-22f, 32f, -12f, 32f, 4);
             c.Arrow(-18f, 10f, 0f);
 
-            c.Bay(2f, 35f, 0f, 3.1f, 6.5f);
+            // Backed up to the dock, so the nose ends up facing out into the yard.
+            c.Bay(2f, 35f, 180f, 3.1f, 6.5f);
         }
 
         private static void ContainerMaze(Writer c)

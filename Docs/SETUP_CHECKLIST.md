@@ -38,6 +38,10 @@ Each course lays its own tarmac pad, so it needs flat empty ground rather than e
 
 Because the thirty missions are distinct places, they can all stand up at once, so **a challenge run is all thirty stages**. `MissionManager.MissionCount` / `HighestMissionId` replaced the old `BaseMissionCount` constant.
 
+**Every bay is painted as a closed yellow rectangle with a direction arrow inside it**, and the arrow is not decoration: the courses are configured with `allowOppositeHeading` off, so the car has to end up facing the way the arrow points, within 20°. Three sides and no arrow was not playable — from inside the car there is no way to tell whether a bay wants you nose in or tail in, and guessing wrong failed the heading check with nothing on screen to say why. The HUD's on-screen arrow to the bay (`BayGuideArrow`) now shows in **every** mode, not only challenge; a player dropped at the start of a practice course has no more idea where the bay is than one halfway round a challenge run.
+
+The markings are **self-lit**. They sit on a flat dark pad under the circuit's existing lighting, where a plain yellow material renders near-black, and a bay the player cannot see is a bay they cannot park in.
+
 Two things worth knowing about the courses:
 
 - **The themed dressing is stand-in.** The project has no models for buses, fuel pumps, forklifts, shipping containers or trolley shelters, so those are sized concrete blocks. The driving problem each level poses — the gaps, the corners, the sight lines — is the real thing; swap the blocks for art when there is any.
@@ -45,7 +49,7 @@ Two things worth knowing about the courses:
 
 `MissionCourseBuilder` also writes each mission's `MissionDefinition` — name, description, parking type, difficulty, reward — because the catalog's old entries described the generated bays and no longer matched anything. Practice runs them untimed; challenge mode puts its own clock on every stage.
 
-`MissionSiteShotTool` renders every mission onto one contact sheet, framed to its own bounds, with `-pitch` for an oblique view and `-only <id>` to look at one course closely. Run it after any change to the courses. It has earned its place repeatedly: it caught a bay laid on grass, courses built through trees, a site buried in the terrain, and — twice — courses that were built perfectly and were completely invisible, once because the capture camera was underground and once because `MaterialPropertyBlock` tints are runtime-only and never reached the saved scene. The pads are dark because of that last one: everything in the kit is cast from the same pale grey block, and without a tinted material asset a course is concrete walls on a concrete floor.
+`MissionSiteShotTool` renders every mission onto one contact sheet, framed to its own bounds, with `-pitch` for an oblique view and `-only <id>` to look at one course closely. Run it after any change to the courses. It has earned its place repeatedly: it caught a bay laid on grass, courses built through trees, a site buried in the terrain, and — twice — courses that were built perfectly and were completely invisible, once because the capture camera was underground and once because `MaterialPropertyBlock` tints are runtime-only and never reached the saved scene. `CollisionProbeTool` now also checks that every mission has solid ground under its start point and its bay: the course pads were first spawned from the kit's flat-marking part, which the kit strips colliders from, so mission 9 looked right from every angle and dropped the car through the floor the moment it loaded. The pads are dark because of that last one: everything in the kit is cast from the same pale grey block, and without a tinted material asset a course is concrete walls on a concrete floor.
 
 Four bugs from the report, and what was actually wrong:
 

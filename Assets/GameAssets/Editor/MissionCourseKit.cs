@@ -89,6 +89,7 @@ namespace CarParkingGame.EditorTools
 
         private readonly Dictionary<string, GameObject> prefabs = new Dictionary<string, GameObject>();
         private readonly Dictionary<string, Vector3> measured = new Dictionary<string, Vector3>();
+        private readonly Dictionary<string, Vector3> centres = new Dictionary<string, Vector3>();
         private readonly List<string> missing = new List<string>();
 
         public IReadOnlyList<string> MissingPrefabs => missing;
@@ -173,7 +174,12 @@ namespace CarParkingGame.EditorTools
             Vector2 centre = (from + to) * 0.5f;
             float yaw = Mathf.Atan2(delta.x, delta.y) * Mathf.Rad2Deg;
 
-            Spawn(part, parent, new Vector3(centre.x, BaseY + height * 0.5f, centre.y), yaw, new Vector3(thickness, height, length));
+            GameObject wall = Spawn(part, parent, new Vector3(centre.x, BaseY + height * 0.5f, centre.y), yaw, new Vector3(thickness, height, length));
+
+            if (part == Part.Concrete)
+            {
+                Tint(wall, "CourseConcrete", new Color(0.74f, 0.73f, 0.70f));
+            }
         }
 
         public void Kerb(Transform parent, Vector2 from, Vector2 to, float width = 0.5f)
@@ -227,8 +233,10 @@ namespace CarParkingGame.EditorTools
                 float t = count == 1 ? 0.5f : i / (float)(count - 1);
                 Vector2 at = Vector2.Lerp(from, to, t);
 
-                Spawn(Part.Concrete, parent, new Vector3(at.x, BaseY + height * 0.5f, at.y), 0f,
+                GameObject pillar = Spawn(Part.Concrete, parent, new Vector3(at.x, BaseY + height * 0.5f, at.y), 0f,
                     new Vector3(thickness, height, thickness));
+
+                Tint(pillar, "CourseConcrete", new Color(0.74f, 0.73f, 0.70f));
             }
         }
 
@@ -282,6 +290,17 @@ namespace CarParkingGame.EditorTools
                     natural.x > 0.0001f ? size.x / natural.x : 1f,
                     natural.y > 0.0001f ? size.y / natural.y : 1f,
                     natural.z > 0.0001f ? size.z / natural.z : 1f);
+
+                // Put the visible mesh where the caller asked for it, not the pivot.
+                //
+                // These prefabs are not centred on their own origins, and the kit scales
+                // them by up to ninety times: an offset of a few centimetres in the asset
+                // becomes metres on the course. It is why the painted bay lines were
+                // nowhere near the bay.
+                Vector3 centre = MeasureCentre(path);
+                Vector3 scaled = Vector3.Scale(centre, instance.transform.localScale);
+
+                instance.transform.localPosition = localPosition - Quaternion.Euler(0f, yawDegrees, 0f) * scaled;
             }
 
             return instance;
@@ -343,6 +362,7 @@ namespace CarParkingGame.EditorTools
                 if (any)
                 {
                     size = bounds.size;
+                    centres[path] = bounds.center;
                 }
 
                 Object.DestroyImmediate(probe);
@@ -352,6 +372,19 @@ namespace CarParkingGame.EditorTools
             return size;
         }
 
+        // Where the prefab's visible mesh sits relative to its own origin. Several of
+        // these assets are modelled off-pivot by a few centimetres, which the kit's
+        // scaling then multiplies into metres.
+        private Vector3 MeasureCentre(string path)
+        {
+            if (!centres.ContainsKey(path))
+            {
+                Measure(path);
+            }
+
+            return centres.TryGetValue(path, out Vector3 centre) ? centre : Vector3.zero;
+        }
+
         // Recolours a spawned part by giving it its own material asset.
         //
         // A MaterialPropertyBlock would have been tidier but it is runtime-only state and
@@ -359,7 +392,7 @@ namespace CarParkingGame.EditorTools
         // were correctly built and completely invisible: concrete walls on a concrete
         // floor. The material is created once and shared by every part that asks for that
         // colour.
-        public static void Tint(GameObject target, string materialName, Color color)
+        public static void Tint(GameObject target, string materialName, Color color, bool selfLit = false)
         {
             if (target == null)
             {
@@ -370,18 +403,28 @@ namespace CarParkingGame.EditorTools
 
             foreach (Renderer renderer in target.GetComponentsInChildren<Renderer>(true))
             {
-                tinted ??= GetTintedMaterial(materialName, color, renderer.sharedMaterial);
+                tinted ??= GetTintedMaterial(materialName, color, renderer.sharedMaterial, selfLit);
 
                 if (tinted != null)
                 {
-                    renderer.sharedMaterial = tinted;
+                    // Every slot, not just the first: some of these meshes have more than
+                    // one submesh, and recolouring slot zero alone leaves the rest as they
+                    // were.
+                    var slots = new Material[renderer.sharedMaterials.Length];
+
+                    for (int i = 0; i < slots.Length; i++)
+                    {
+                        slots[i] = tinted;
+                    }
+
+                    renderer.sharedMaterials = slots;
                 }
             }
         }
 
         private const string MaterialFolder = "Assets/GameAssets/Materials";
 
-        private static Material GetTintedMaterial(string name, Color color, Material source)
+        private static Material GetTintedMaterial(string name, Color color, Material source, bool selfLit = false)
         {
             string path = $"{MaterialFolder}/{name}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -409,6 +452,39 @@ namespace CarParkingGame.EditorTools
 
             material.SetColor("_BaseColor", color);
             material.SetColor("_Color", color);
+
+            // Flat colour, every map cleared. The kit scales one small block into pads and
+            // walls tens of metres long, which stretches its textures up to ninety times
+            // in one axis: with the albedo on, the pads were grey smears and the painted
+            // bay lines were stretched until they were not there at all; with only the
+            // albedo cleared, the normal map was still there and lit the surface as if it
+            // were rippled sheet metal.
+            foreach (string property in material.GetTexturePropertyNames())
+            {
+                material.SetTexture(property, null);
+            }
+
+            // Matte, like road surface and concrete. The source blocks are shiny enough to
+            // throw a highlight across a twenty-metre pad.
+            if (material.HasProperty("_Smoothness"))
+            {
+                material.SetFloat("_Smoothness", 0.05f);
+            }
+
+            if (material.HasProperty("_Glossiness"))
+            {
+                material.SetFloat("_Glossiness", 0.05f);
+            }
+
+            // Road markings are lit by the material itself. The courses sit under the
+            // circuit's existing lighting, which leaves a flat ground plane very dark, and
+            // a bay the player cannot see is a bay they cannot park in.
+            if (selfLit)
+            {
+                material.EnableKeyword("_EMISSION");
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                material.SetColor("_EmissionColor", color * 0.85f);
+            }
 
             if (!AssetDatabase.IsValidFolder(MaterialFolder))
             {

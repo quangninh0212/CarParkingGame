@@ -66,6 +66,18 @@ namespace CarParkingGame.EditorTools
                     extra = collider.isTrigger ? "(trigger)" : "(solid)";
                 }
 
+                if (component is Renderer renderer)
+                {
+                    var names = new List<string>();
+
+                    foreach (Material material in renderer.sharedMaterials)
+                    {
+                        names.Add(material != null ? material.name : "<none>");
+                    }
+
+                    extra = "[" + string.Join("|", names) + "]";
+                }
+
                 components.Add(component.GetType().Name + extra);
             }
 
