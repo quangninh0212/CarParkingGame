@@ -334,33 +334,54 @@ namespace CarParkingGame.EditorTools
             chip.SetActive(false);
         }
 
-        // The strip of glass across the top of the screen, and the component that renders
-        // the world behind the car into it. Top centre, which is where a driver looks for
-        // a mirror and where nothing else on the HUD lives.
+        // The three mirrors across the top of the screen - door mirror, rear-view, door
+        // mirror - and the component that renders the world behind the car into them.
+        //
+        // Offset right of centre rather than dead centre: the mission panel runs to
+        // x = 760 on the left and the bay counter starts at 1454 on the right, so a group
+        // centred on the canvas would sit on top of the coin count.
         private static void BuildRearViewMirror(GameObject hud)
         {
-            // Offset right of centre rather than dead centre. The mission panel runs to
-            // x = 760 on the left and the bay counter starts at 1454 on the right, so a
-            // mirror centred on the canvas sits on top of the coin count.
-            GameObject frame = CreatePanel(hud.transform, "RearMirror", new Vector2(0.5f, 1f),
-                new Vector2(110f, -84f), new Vector2(580f, 160f), new Color(0.07f, 0.07f, 0.08f, 0.95f));
+            GameObject group = CreateChild(hud.transform, "RearMirrors");
+            SetRect(group.GetComponent<RectTransform>(), new Vector2(0.5f, 1f),
+                new Vector2(142f, -78f), new Vector2(672f, 136f), new Vector2(0.5f, 0.5f));
 
-            GameObject surface = CreateChild(frame.transform, "Glass");
-            var glass = surface.AddComponent<RawImage>();
+            RawImage left = MirrorGlass(group.transform, "LeftMirror", new Vector2(0f, 0.5f),
+                new Vector2(100f, -6f), new Vector2(196f, 112f));
 
-            // Inset, so the dark panel reads as the bezel round the glass.
-            SetRect(glass.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(556f, 136f), new Vector2(0.5f, 0.5f));
+            RawImage centre = MirrorGlass(group.transform, "RearMirror", new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 2f), new Vector2(256f, 126f));
 
-            // Nothing to press. Left on, the mirror would eat taps meant for the HUD
-            // underneath it.
-            glass.raycastTarget = false;
+            RawImage right = MirrorGlass(group.transform, "RightMirror", new Vector2(1f, 0.5f),
+                new Vector2(-100f, -6f), new Vector2(196f, 112f));
 
             var mirror = hud.AddComponent<RearViewMirror>();
-            SetPrivate(mirror, "glass", glass);
-            SetPrivate(mirror, "frame", frame);
+            SetPrivate(mirror, "frame", group);
+            SetPrivate(mirror, "centreGlass", centre);
+            SetPrivate(mirror, "leftGlass", left);
+            SetPrivate(mirror, "rightGlass", right);
+            SetPrivate(mirror, "director", Object.FindFirstObjectByType<VehicleCameraDirector>(FindObjectsInactive.Include));
 
-            // Off until there is a car to be behind it.
-            frame.SetActive(false);
+            // Off until the player is sitting in a car.
+            group.SetActive(false);
+        }
+
+        // One mirror: a dark bezel with the glass inset into it.
+        private static RawImage MirrorGlass(Transform parent, string name, Vector2 anchor,
+            Vector2 position, Vector2 size)
+        {
+            GameObject bezel = CreatePanel(parent, name, anchor, position, size, new Color(0.07f, 0.07f, 0.08f, 0.95f));
+
+            GameObject surface = CreateChild(bezel.transform, "Glass");
+            var glass = surface.AddComponent<RawImage>();
+
+            SetRect(glass.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero,
+                size - new Vector2(16f, 16f), new Vector2(0.5f, 0.5f));
+
+            // Nothing to press. Left on, a mirror would eat taps meant for the HUD under it.
+            glass.raycastTarget = false;
+
+            return glass;
         }
 
         private static void BuildSpeedometer(GameObject hud)

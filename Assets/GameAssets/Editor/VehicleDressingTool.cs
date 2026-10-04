@@ -373,7 +373,12 @@ namespace CarParkingGame.EditorTools
 
             // Checked by rendering what each car's driver actually sees; see
             // VehicleViewShotTool. Lower than this and the view is the dashboard.
-            points.EditorSetFractions(-0.42f, 0.3f, 0.7f, -0.45f, 1f);
+            // Eye height is a fraction of the body height measured up from its floor, and
+            // 0.7 of it sat the driver level with the window line: the bonnet filled the
+            // bottom half of the screen and the road was barely visible. These cars have no
+            // interior to sit inside, so the seated view is really a view from the top of
+            // the windscreen, and it has to be high enough to see the road over the wing.
+            points.EditorSetFractions(-0.42f, 0.34f, 1.1f, -0.45f, 1f);
             points.Measure();
             EditorUtility.SetDirty(points);
 

@@ -237,15 +237,13 @@ namespace CarParkingGame.EditorTools
             // The mirror only renders while a car is being driven, which does not happen in
             // the editor, so the shot shows the empty glass. It is here to check that the
             // frame sits where a driver would look for it and does not cover the HUD.
-            Transform mirror = hud.Find("RearMirror");
+            Transform mirrors = hud.Find("RearMirrors");
 
-            if (mirror != null)
+            if (mirrors != null)
             {
-                mirror.gameObject.SetActive(true);
+                mirrors.gameObject.SetActive(true);
 
-                var glass = mirror.GetComponentInChildren<RawImage>(true);
-
-                if (glass != null)
+                foreach (RawImage glass in mirrors.GetComponentsInChildren<RawImage>(true))
                 {
                     glass.color = new Color(0.16f, 0.17f, 0.19f, 1f);
                 }

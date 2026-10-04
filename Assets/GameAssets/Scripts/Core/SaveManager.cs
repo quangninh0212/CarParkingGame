@@ -53,6 +53,15 @@ namespace CarParkingGame.Core
                 data = loaded;
             }
 
+            // Not in Sanitize: that is a repair function, and handing out money is not a
+            // repair. It belongs at the one point where a file becomes the save being
+            // played, which happens once per run.
+            if (TestFunds.TryGrant(data))
+            {
+                Debug.Log($"[SaveManager] Test funds: {TestFunds.Coins} coins granted, {data.coins} in hand.");
+                Save();
+            }
+
             Loaded?.Invoke();
             return data;
         }
