@@ -27,6 +27,10 @@ namespace CarParkingGame.EditorTools
         private const string HornClipPath = AudioFolder + "/HornPlaceholder.wav";
         private const string MaterialFolder = "Assets/GameAssets/Materials";
         private const string ImpactSourceName = "ImpactAudio";
+        private const string BrakeSourceName = "BrakeAudio";
+
+        private const string CrashClipPath = "Assets/GameAssets/Audio/car_crash.mp3";
+        private const string BrakeClipPath = "Assets/GameAssets/Audio/car-braking.mp3";
         private const string LampParentName = "PlaceholderLights";
 
         private static readonly Color HeadlightColor = new Color(1f, 0.96f, 0.85f);
@@ -231,54 +235,110 @@ namespace CarParkingGame.EditorTools
             WireCollisionAudio(car);
         }
 
-        // The noise the car makes when it hits something.
+        // The noises the car makes when it hits something and when it is stood on the
+        // brake.
         //
-        // It listens for collisions itself rather than going through the mission system,
-        // because the reporter the missions attach only exists while a mission is running
-        // - and a car that is silent in free roam sounds broken.
+        // Both listen for themselves rather than going through the mission system, because
+        // the reporter the missions attach only exists while a mission is running - and a
+        // car that is silent in free roam sounds broken.
         private static void WireCollisionAudio(CarController car)
         {
-            AudioClip soft = AssetDatabase.LoadAssetAtPath<AudioClip>(ImpactSoundGenerator.SoftPath);
-            AudioClip hard = AssetDatabase.LoadAssetAtPath<AudioClip>(ImpactSoundGenerator.HardPath);
+            AudioClip crash = PrepareClip(CrashClipPath);
+            AudioClip braking = PrepareClip(BrakeClipPath);
 
-            if (soft == null || hard == null)
+            if (crash == null)
             {
-                Debug.LogWarning("[VehicleDressingTool] No impact clips; run Tools > Car Parking > Generate Impact Sounds first.");
-                return;
+                Debug.LogWarning($"[VehicleDressingTool] No crash clip at '{CrashClipPath}'; the car will hit things in silence.");
             }
 
-            var audio = car.GetComponent<VehicleCollisionAudio>();
-
-            if (audio == null)
+            if (braking == null)
             {
-                audio = car.gameObject.AddComponent<VehicleCollisionAudio>();
+                Debug.LogWarning($"[VehicleDressingTool] No brake clip at '{BrakeClipPath}'; braking will be silent.");
             }
 
-            // Its own source, so an impact never cuts off the engine loop sharing a source
-            // with it.
-            Transform existing = car.transform.Find(ImpactSourceName);
+            var impact = car.GetComponent<VehicleCollisionAudio>();
+
+            if (impact == null)
+            {
+                impact = car.gameObject.AddComponent<VehicleCollisionAudio>();
+            }
+
+            var brake = car.GetComponent<VehicleBrakeAudio>();
+
+            if (brake == null)
+            {
+                brake = car.gameObject.AddComponent<VehicleBrakeAudio>();
+            }
+
+            // A source each. One shared source would mean a crash cutting off the brake,
+            // and both of them cutting off the engine loop.
+            AudioSource impactSource = MakeAudioSource(car, ImpactSourceName, 0.9f);
+            AudioSource brakeSource = MakeAudioSource(car, BrakeSourceName, 0.8f);
+
+            var impactSerialized = new SerializedObject(impact);
+            SetObject(impactSerialized, "impact", crash);
+            SetObject(impactSerialized, "source", impactSource);
+            impactSerialized.ApplyModifiedProperties();
+
+            var brakeSerialized = new SerializedObject(brake);
+            SetObject(brakeSerialized, "brakeClip", braking);
+            SetObject(brakeSerialized, "source", brakeSource);
+            brakeSerialized.ApplyModifiedProperties();
+
+            EditorUtility.SetDirty(impact);
+            EditorUtility.SetDirty(brake);
+
+            Debug.Log($"[VehicleDressingTool] '{car.name}': crash '{(crash != null ? crash.name : "none")}', brake '{(braking != null ? braking.name : "none")}'.", car);
+        }
+
+        // Short effects played often: decoded once at load rather than streamed or
+        // decoded on every play, and forced to mono because they are played flat anyway.
+        private static AudioClip PrepareClip(string path)
+        {
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+
+            if (clip == null)
+            {
+                return null;
+            }
+
+            if (AssetImporter.GetAtPath(path) is AudioImporter importer)
+            {
+                AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+                settings.loadType = AudioClipLoadType.DecompressOnLoad;
+                settings.preloadAudioData = true;
+
+                importer.defaultSampleSettings = settings;
+                importer.forceToMono = true;
+                importer.SaveAndReimport();
+            }
+
+            Debug.Log($"[VehicleDressingTool] Clip '{clip.name}' is {clip.length:0.00}s, {clip.channels} channel(s).");
+            return clip;
+        }
+
+        private static AudioSource MakeAudioSource(CarController car, string name, float volume)
+        {
+            Transform existing = car.transform.Find(name);
 
             if (existing != null)
             {
                 UnityEngine.Object.DestroyImmediate(existing.gameObject);
             }
 
-            var host = new GameObject(ImpactSourceName);
+            var host = new GameObject(name);
             host.transform.SetParent(car.transform, false);
 
             AudioSource source = host.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.loop = false;
+
+            // Flat rather than positioned: the listener is the player's own car, so there
+            // is no distance for a 3D blend to express.
             source.spatialBlend = 0f;
-            source.volume = 0.9f;
+            source.volume = volume;
 
-            var serialized = new SerializedObject(audio);
-            SetObject(serialized, "softImpact", soft);
-            SetObject(serialized, "hardImpact", hard);
-            SetObject(serialized, "source", source);
-            serialized.ApplyModifiedProperties();
-
-            EditorUtility.SetDirty(audio);
+            return source;
         }
 
         private static bool IsPaintMaterial(Material material)

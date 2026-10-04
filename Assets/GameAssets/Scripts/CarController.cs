@@ -97,6 +97,10 @@ public class CarController : MonoBehaviour
     public float ThrottleInput => moveInput;
     public float SteeringInput => steerInput;
     public bool IsBraking => brakesApplied;
+
+    // The brake actually being held, as opposed to IsBraking, which is also true whenever
+    // the car is coasting with no throttle. Only the held one is worth a noise.
+    public bool IsBrakeHeld => brakeHeld;
     public bool VehicleEnabled => vehicleEnabled;
     public Vector3 Velocity => carRB != null ? carRB.linearVelocity : Vector3.zero;
     public float CurrentSpeed => carRB != null ? carRB.linearVelocity.magnitude : 0f;

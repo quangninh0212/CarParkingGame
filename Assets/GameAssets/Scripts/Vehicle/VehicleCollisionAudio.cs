@@ -4,6 +4,10 @@ namespace CarParkingGame.Vehicle
 {
     // The noise the car makes when it hits something.
     //
+    // One clip, with the impulse deciding how loud and how deep it plays. A light kerb
+    // and a wall hitting the same sample at the same volume is what makes a collision
+    // sound canned, and pitch carries most of the difference.
+    //
     // This listens for collisions itself rather than going through
     // VehicleCollisionReporter. The reporter is added to the car at runtime by whichever
     // mission is being played, so it does not exist in free roam, in the menu showroom, or
@@ -12,8 +16,7 @@ namespace CarParkingGame.Vehicle
     [RequireComponent(typeof(Rigidbody))]
     public class VehicleCollisionAudio : MonoBehaviour
     {
-        [SerializeField] private AudioClip softImpact;
-        [SerializeField] private AudioClip hardImpact;
+        [SerializeField] private AudioClip impact;
         [SerializeField] private AudioSource source;
 
         [Tooltip("Impulse below this is the car settling against something it is already touching, and makes no noise.")]
@@ -21,9 +24,6 @@ namespace CarParkingGame.Vehicle
 
         [Tooltip("Impulse at or above this plays the heavy hit at full volume.")]
         [SerializeField] private float loudAt = 9f;
-
-        [Tooltip("Impulse at which the heavy hit takes over from the light one.")]
-        [SerializeField] private float heavyAt = 3.5f;
 
         [Tooltip("Seconds before the same car can make another impact noise. One collision reports several contacts.")]
         [SerializeField] private float retriggerSeconds = 0.13f;
@@ -67,9 +67,7 @@ namespace CarParkingGame.Vehicle
                 return;
             }
 
-            AudioClip clip = impulse >= heavyAt && hardImpact != null ? hardImpact : softImpact;
-
-            if (clip == null)
+            if (impact == null)
             {
                 return;
             }
@@ -81,7 +79,7 @@ namespace CarParkingGame.Vehicle
             float weight = Mathf.InverseLerp(quietBelow, loudAt, impulse);
 
             source.pitch = Mathf.Lerp(1.18f, 0.82f, weight) + Random.Range(-0.04f, 0.04f);
-            source.PlayOneShot(clip, Mathf.Lerp(0.25f, 1f, weight));
+            source.PlayOneShot(impact, Mathf.Lerp(0.25f, 1f, weight));
         }
     }
 }
