@@ -33,7 +33,7 @@ namespace CarParkingGame.EditorTools
             ProbeCars();
             ProbeProps();
 
-            int failures = VerifyContact() + VerifyMissionFloors();
+            int failures = VerifyContact() + VerifyParkedCars() + VerifyMissionFloors();
 
             Debug.Log(failures == 0
                 ? "[CollisionProbeTool] Every car makes contact with every kind of prop it should."
@@ -239,6 +239,77 @@ namespace CarParkingGame.EditorTools
 
                 car.gameObject.SetActive(wasActive);
             }
+
+            return failures;
+        }
+
+        // A car parked as scenery has to be something the player's car hits.
+        //
+        // The prop check above cannot see one. It classifies by mesh name, and a parked car
+        // is a prefab instance whose meshes carry the car pack's own names - so cars were
+        // the one kind of obstacle in a course that nothing proved was solid. The kit does
+        // strip every collider off a parked car before fitting one of its own, and a bad
+        // prefab, or a change to that stripping, would leave the course full of obstacles
+        // the player drives straight through.
+        private static int VerifyParkedCars()
+        {
+            int failures = 0;
+            int checked_ = 0;
+
+            CarController player = Object.FindFirstObjectByType<CarController>(FindObjectsInactive.Include);
+            Transform body = player != null ? player.transform.Find("BodyCollider") : null;
+            var playerCollider = body != null ? body.GetComponent<Collider>() : null;
+
+            if (playerCollider == null)
+            {
+                Debug.LogError("[CollisionProbeTool] No player car with a BodyCollider to test parked cars against.");
+                return 1;
+            }
+
+            bool wasActive = player.gameObject.activeSelf;
+            player.gameObject.SetActive(true);
+
+            foreach (Transform parked in Object.FindObjectsByType<Transform>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (!parked.name.StartsWith(MissionCourseKit.ParkedCarPrefix, System.StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var collider = parked.GetComponentInChildren<Collider>(true);
+
+                if (collider == null)
+                {
+                    Debug.LogError($"[CollisionProbeTool] '{parked.name}' has no collider: the player drives through it.");
+                    failures++;
+                    continue;
+                }
+
+                // Nose to nose with it, at its own height.
+                bool touches = Physics.ComputePenetration(
+                    playerCollider, collider.bounds.center, parked.rotation,
+                    collider, collider.transform.position, collider.transform.rotation,
+                    out Vector3 _, out float depth);
+
+                if (!touches)
+                {
+                    Debug.LogError($"[CollisionProbeTool] '{parked.name}' has a collider that does not fill it; "
+                        + "the player drives through it.");
+                    failures++;
+                    continue;
+                }
+
+                checked_++;
+
+                if (checked_ <= 3)
+                {
+                    Debug.Log($"[CollisionProbeTool] OK '{parked.name}': solid, {depth:0.000}m deep.");
+                }
+            }
+
+            Debug.Log($"[CollisionProbeTool] {checked_} parked car(s) are solid.");
+            player.gameObject.SetActive(wasActive);
 
             return failures;
         }

@@ -1060,10 +1060,12 @@ namespace CarParkingGame.EditorTools
             // switched on, so only one block of city is ever loaded - and a ring that hugs
             // the lot is what a player sees over a 1.15m wall, where a city scattered over
             // four hundred metres was mostly out of sight and the rest of it floating.
+            // Shared by the road slab and by whatever stands on the kerb beside it.
+            private const float RoadWidth = 8f;
+
             public void Surround()
             {
                 const float Verge = 1.5f;
-                const float RoadWidth = 8f;
                 const float Pavement = 2.5f;
 
                 float half = course.width * 0.5f;
@@ -1225,6 +1227,13 @@ namespace CarParkingGame.EditorTools
                     Vector2 from = corners[i];
                     Vector2 to = corners[(i + 1) % corners.Length];
 
+                    Vector2 along = (to - from).normalized;
+
+                    // The outer kerb. The ring runs anticlockwise, so the outside of it is
+                    // on the cars' right - which is the side a light belongs on, and the
+                    // side that is not the car park wall.
+                    var outward = new Vector2(along.y, -along.x);
+
                     int steps = Mathf.Max(2, Mathf.CeilToInt((to - from).magnitude / 10f));
 
                     for (int step = 0; step < steps; step++)
@@ -1246,8 +1255,17 @@ namespace CarParkingGame.EditorTools
                         if (step == steps - 2 && lightPrefab != null)
                         {
                             var head = (GameObject)PrefabUtility.InstantiatePrefab(lightPrefab, host.transform);
-                            head.transform.localPosition = point.transform.localPosition;
-                            head.transform.localRotation = Quaternion.Euler(0f, i * 90f, 0f);
+
+                            // On the kerb rather than in the lane, and turned so its face is
+                            // towards the cars coming up to it. The head carries its lamps on
+                            // its own -Z, so pointing the head the way the traffic is going
+                            // puts the lamps in the drivers' eyes. Before this it stood in
+                            // the middle of the road showing its side to everyone.
+                            Vector2 kerb = at + outward * (RoadWidth * 0.5f + 0.9f);
+
+                            head.transform.localPosition = new Vector3(kerb.x, level, kerb.y);
+                            head.transform.localRotation = Quaternion.LookRotation(
+                                new Vector3(along.x, 0f, along.y), Vector3.up);
 
                             var light = head.GetComponent<CarParkingGame.Traffic.TrafficLight>();
                             lights.Add(light);
@@ -1285,6 +1303,12 @@ namespace CarParkingGame.EditorTools
 
                 var group = host.gameObject.AddComponent<CarParkingGame.Traffic.TrafficLightGroup>();
                 var serialized = new SerializedObject(group);
+
+                // Short phases. A junction on a public road holds a queue for half a minute;
+                // here a car that waits that long is a car the player never sees move.
+                serialized.FindProperty("greenSeconds").floatValue = 6f;
+                serialized.FindProperty("yellowSeconds").floatValue = 1.5f;
+
                 SerializedProperty phases = serialized.FindProperty("phases");
 
                 phases.arraySize = 2;
@@ -1351,11 +1375,11 @@ namespace CarParkingGame.EditorTools
                 paths.arraySize = 1;
                 paths.GetArrayElementAtIndex(0).objectReferenceValue = path;
 
-                // The ceiling on the pool. How many of those are switched on comes from the
-                // player's graphics setting - four, eight or twelve - so a ceiling under
-                // twelve quietly caps the high setting as well, which is what left the ring
-                // looking empty.
-                serialized.FindProperty("maximumVehicles").intValue = 12;
+                // Four or five, which is what a ring this short carries while still moving.
+                // Twelve filled it: with lights holding two of the four corners at a time
+                // the queue reached back to the corner behind, so most of what the player
+                // saw was cars standing still.
+                serialized.FindProperty("maximumVehicles").intValue = 5;
                 serialized.FindProperty("poolParent").objectReferenceValue = pool.transform;
                 serialized.ApplyModifiedProperties();
             }
