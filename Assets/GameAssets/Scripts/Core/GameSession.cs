@@ -278,11 +278,15 @@ namespace CarParkingGame.Core
             SetActive(menuCamera, showing);
             SetActive(gameplayCamera, !showing);
             SetActive(showroomCars, showing);
-            SetActive(mobileControls, false);
+
+            // Hidden while a menu screen is over the level, and put back when it closes.
+            // Switching them off both ways left the player back in the level with no
+            // steering wheel and no pedals, and nothing short of restarting brought them
+            // back.
+            SetActive(mobileControls, !showing);
         }
 
-        // Back to the level after the pause menu is done with it. The driving controls stay
-        // hidden until the player actually resumes.
+        // Back to the level after the pause menu is done with it.
         public void RestoreGameplayCamera()
         {
             ShowShowroomOverPause(false);

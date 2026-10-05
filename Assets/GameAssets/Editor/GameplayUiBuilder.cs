@@ -116,8 +116,6 @@ namespace CarParkingGame.EditorTools
             AddVisibility(canvasObject, new Object[] { hud }, false);
             AddVisibility(canvasObject, new Object[] { menuRoot }, true);
 
-            SetPrivate(menu, "menuRoot", menuRoot);
-
             // The pause screen borrows the menu own settings screen rather than keeping a
             // second copy of it, so it needs to know where the menu lives.
             var pauseView = canvasObject.GetComponent<PauseMenuView>();
@@ -1104,7 +1102,13 @@ namespace CarParkingGame.EditorTools
 
             Button go = WideButton(panel.transform, "ContinueButton", "CONTINUE", new Vector2(0.5f, 0f), new Vector2(0f, 78f), new Vector2(420f, 88f), AccentColor);
 
-            var view = screen.AddComponent<StoryIntroView>();
+            // On the menu root rather than on the screen it shows.
+            //
+            // A component on a deactivated object never wakes, so its Awake never ran, so
+            // the home screen's STORY button was wired to nothing and pressing it did
+            // nothing at all. The root is on whenever the menu is, which is exactly when
+            // the button can be pressed.
+            var view = parent.gameObject.AddComponent<StoryIntroView>();
             SetPrivate(view, "panel", screen);
             SetPrivate(view, "titleLabel", title);
             SetPrivate(view, "bodyLabel", body);

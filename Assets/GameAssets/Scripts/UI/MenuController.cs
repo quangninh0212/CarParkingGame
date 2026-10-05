@@ -24,9 +24,6 @@ namespace CarParkingGame.UI
         [SerializeField] private GameObject garageScreen;
         [SerializeField] private GameObject settingsScreen;
 
-        [Tooltip("The container holding every menu screen. Hidden outright while driving.")]
-        [SerializeField] private GameObject menuRoot;
-
         [Tooltip("Aims the menu camera at the showroom car; the garage screen needs it framed differently.")]
         [SerializeField] private ShowroomCameraRig showroom;
 
@@ -215,15 +212,13 @@ namespace CarParkingGame.UI
 
         private void OnModeChanged(GameplayMode mode)
         {
-            bool inMenu = mode == GameplayMode.None;
             overPause = false;
 
-            if (menuRoot != null)
-            {
-                menuRoot.SetActive(inMenu);
-            }
-
-            if (inMenu)
+            // The root is switched by SessionVisibility, not here. This used to do it too,
+            // and since this component lives on that root it was switching itself off -
+            // after which it could not hear the event that would have switched it back on.
+            // It only ever worked because SessionVisibility was doing the real job.
+            if (mode == GameplayMode.None)
             {
                 GoHome();
             }

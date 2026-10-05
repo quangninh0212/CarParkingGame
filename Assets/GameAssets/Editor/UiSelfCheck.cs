@@ -76,11 +76,14 @@ namespace CarParkingGame.EditorTools
             CheckReferences<SettingsView>(problems);
             CheckReferences<ShowroomCameraRig>(problems);
             CheckReferences<ScreenFade>(problems);
+            CheckReferences<StoryIntroView>(problems, "openButton");
+            CheckReferences<ChapterBanner>(problems);
             CheckReferences<CarParkingGame.Vehicle.RearViewMirror>(problems);
 
             CheckLegacyUiIsOff(problems);
             CheckScreensAreExclusive(problems);
             CheckGarageIsLive(problems);
+            CheckNoViewHidesItself(problems);
             CheckPracticeGate(problems);
 
             return problems;
@@ -211,6 +214,52 @@ namespace CarParkingGame.EditorTools
             }
 
             Debug.Log($"[UiSelfCheck] Practice unlocks in order: 1 of {total} missions open on a fresh save.");
+        }
+
+        // No view may own the panel it switches off.
+        //
+        // A component on a deactivated GameObject never wakes, so its Awake never runs, so
+        // the buttons it was meant to subscribe to are wired to nothing. The story screen
+        // shipped like that: the component sat on the screen, the screen started off, and
+        // the STORY button on the home screen did nothing at all when pressed. Nothing in
+        // the editor says so - the references are all assigned, and the inspector looks
+        // perfectly correct.
+        private static void CheckNoViewHidesItself(List<string> problems)
+        {
+            foreach (MonoBehaviour view in Object.FindObjectsByType<MonoBehaviour>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (view == null || view.GetType().Namespace != "CarParkingGame.UI")
+                {
+                    continue;
+                }
+
+                var serialized = new SerializedObject(view);
+                SerializedProperty property = serialized.GetIterator();
+
+                while (property.NextVisible(true))
+                {
+                    if (property.propertyType != SerializedPropertyType.ObjectReference)
+                    {
+                        continue;
+                    }
+
+                    if (property.objectReferenceValue is not GameObject panel)
+                    {
+                        continue;
+                    }
+
+                    if (panel != view.gameObject)
+                    {
+                        continue;
+                    }
+
+                    problems.Add(
+                        $"{view.GetType().Name} on '{view.name}' holds its own GameObject in '{property.name}'. " +
+                        "If it ever switches that off it switches itself off with it, and it never wakes again.");
+                    break;
+                }
+            }
         }
 
         private static void CheckLegacyUiIsOff(List<string> problems)
