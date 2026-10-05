@@ -78,9 +78,6 @@ namespace CarParkingGame.EditorTools
                 horn = AssetDatabase.LoadAssetAtPath<AudioClip>(HornClipPath);
             }
 
-            Material headlightMaterial = LoadOrCreateEmissiveMaterial("LampHeadlight", HeadlightColor);
-            Material brakeMaterial = LoadOrCreateEmissiveMaterial("LampBrake", BrakeColor);
-            Material indicatorMaterial = LoadOrCreateEmissiveMaterial("LampIndicator", IndicatorColor);
 
             CarController[] cars = UnityEngine.Object.FindObjectsByType<CarController>(
                 FindObjectsInactive.Include,
@@ -94,7 +91,7 @@ namespace CarParkingGame.EditorTools
 
             foreach (CarController car in cars)
             {
-                DressCar(car, horn, headlightMaterial, brakeMaterial, indicatorMaterial);
+                DressCar(car, horn);
             }
 
             DressShowroomCars();
@@ -103,10 +100,7 @@ namespace CarParkingGame.EditorTools
 
         private static void DressCar(
             CarController car,
-            AudioClip horn,
-            Material headlightMaterial,
-            Material brakeMaterial,
-            Material indicatorMaterial)
+            AudioClip horn)
         {
             if (!TryMeasureCar(car, out CarMeasurements measurements))
             {
@@ -145,49 +139,39 @@ namespace CarParkingGame.EditorTools
             float noseZ = haveBody ? body.max.z : measurements.frontZ + measurements.overhang;
             float tailZ = haveBody ? body.min.z : measurements.rearZ - measurements.overhang;
 
-            // Lamp units, not dots.
+            // No lamp geometry at all any more.
             //
-            // These were spheres, which from the driving camera read as a bead stuck on the
-            // nose rather than as a headlight. A wide, shallow box set half into the
-            // bodywork reads as a lamp pressed into the panel, which is what a lamp is.
-            const float Depth = 0.1f;
-
-            // Half in, half out. Fully proud and it is a lump bolted to the front; fully
-            // sunk and the body hides it.
-            float frontZ = noseZ + 0.01f;
-            float rearZ = tailZ - 0.01f;
-
-            var headlightSize = new Vector3(halfBodyWidth * 0.38f, halfBodyWidth * 0.21f, Depth);
-            var brakeSize = new Vector3(halfBodyWidth * 0.38f, halfBodyWidth * 0.19f, Depth);
-            var indicatorSize = new Vector3(halfBodyWidth * 0.16f, halfBodyWidth * 0.17f, Depth);
-
-            // The main lamps inboard, the indicators out at the corners, with a gap - they
-            // are separate lamps on a real car and running them together loses both.
+            // It used to add eight boxes to the car - headlights, tail lights, four
+            // indicators. However they were sized or shaped, they sat outside the bodywork
+            // and read as blocks bolted to the car, which is what a player called them, and
+            // the tail pair glowed behind the car the entire time it stood still.
+            //
+            // The cars already have their lamps. Every one of these models names the
+            // materials: Mc_FrontLights, K_RearLights, B_FlickerLights. Lighting the lens
+            // the model already has cannot look stuck on, because it is not stuck on.
             float sideX = halfBodyWidth * 0.56f;
-            float cornerX = halfBodyWidth * 0.86f;
 
-            // Headlamp height: a third of the way up the body, which is where a bumper
-            // lamp sits on all three of these cars.
             float lampY = haveBody
                 ? body.min.y + body.size.y * 0.34f
                 : measurements.wheelY + measurements.halfWidth * 0.55f;
 
-            GameObject headlightLeft = CreateLamp(lampRoot.transform, "HeadlightLeft", new Vector3(centreX - sideX, lampY, frontZ), headlightSize, headlightMaterial);
-            GameObject headlightRight = CreateLamp(lampRoot.transform, "HeadlightRight", new Vector3(centreX + sideX, lampY, frontZ), headlightSize, headlightMaterial);
+            float frontZ = noseZ + 0.01f;
 
-            GameObject brakeLeft = CreateLamp(lampRoot.transform, "BrakeLeft", new Vector3(centreX - sideX, lampY, rearZ), brakeSize, brakeMaterial);
-            GameObject brakeRight = CreateLamp(lampRoot.transform, "BrakeRight", new Vector3(centreX + sideX, lampY, rearZ), brakeSize, brakeMaterial);
-
-            GameObject indicatorFrontLeft = CreateLamp(lampRoot.transform, "IndicatorFrontLeft", new Vector3(centreX - cornerX, lampY, frontZ), indicatorSize, indicatorMaterial);
-            GameObject indicatorRearLeft = CreateLamp(lampRoot.transform, "IndicatorRearLeft", new Vector3(centreX - cornerX, lampY, rearZ), indicatorSize, indicatorMaterial);
-            GameObject indicatorFrontRight = CreateLamp(lampRoot.transform, "IndicatorFrontRight", new Vector3(centreX + cornerX, lampY, frontZ), indicatorSize, indicatorMaterial);
-            GameObject indicatorRearRight = CreateLamp(lampRoot.transform, "IndicatorRearRight", new Vector3(centreX + cornerX, lampY, rearZ), indicatorSize, indicatorMaterial);
-
-            // Two real spot lights only for the headlights. They are switched off unless the
-            // player turns the headlights on, and they are the one genuinely expensive part
-            // of this - drop them first if a low-end device struggles.
+            // Two real spot lights, so switching the headlights on actually lights the road
+            // ahead. They are the one genuinely expensive part of this - drop them first if
+            // a low-end device struggles.
             Light spotLeft = CreateHeadlightSpot(lampRoot.transform, new Vector3(centreX - sideX, lampY, frontZ), measurements);
             Light spotRight = CreateHeadlightSpot(lampRoot.transform, new Vector3(centreX + sideX, lampY, frontZ), measurements);
+
+            LampSurface[] headlightSurfaces = FindLampSurfaces(car, HeadlightWords);
+            LampSurface[] brakeSurfaces = FindLampSurfaces(car, BrakeLightWords);
+            LampSurface[] indicatorSurfaces = FindLampSurfaces(car, IndicatorWords);
+
+            if (indicatorSurfaces.Length == 0)
+            {
+                indicatorSurfaces = brakeSurfaces;
+                Debug.Log($"[VehicleDressingTool] '{car.name}' has no park lamp, so it indicates on its tail lamps.", car);
+            }
 
             VehicleLights lights = car.GetComponent<VehicleLights>();
 
@@ -199,10 +183,14 @@ namespace CarParkingGame.EditorTools
             var serialized = new SerializedObject(lights);
             SetObject(serialized, "car", car);
 
-            SetLightGroup(serialized, "headlights", new[] { headlightLeft, headlightRight }, new[] { spotLeft, spotRight });
-            SetLightGroup(serialized, "brakeLights", new[] { brakeLeft, brakeRight }, Array.Empty<Light>());
-            SetLightGroup(serialized, "leftIndicator", new[] { indicatorFrontLeft, indicatorRearLeft }, Array.Empty<Light>());
-            SetLightGroup(serialized, "rightIndicator", new[] { indicatorFrontRight, indicatorRearRight }, Array.Empty<Light>());
+            // Both indicators share the car's one set of indicator lenses. These models do
+            // not separate left from right, so a left signal lights the same glass as a
+            // right one - the flashing says the car is indicating, and the on-screen arrow
+            // says which way.
+            SetLightGroup(serialized, "headlights", new[] { spotLeft, spotRight }, headlightSurfaces, HeadlightColor);
+            SetLightGroup(serialized, "brakeLights", Array.Empty<Light>(), brakeSurfaces, BrakeColor);
+            SetLightGroup(serialized, "leftIndicator", Array.Empty<Light>(), indicatorSurfaces, IndicatorColor);
+            SetLightGroup(serialized, "rightIndicator", Array.Empty<Light>(), indicatorSurfaces, IndicatorColor);
 
             serialized.ApplyModifiedProperties();
 
@@ -221,7 +209,7 @@ namespace CarParkingGame.EditorTools
             MeasureViewPoints(car);
             FitBodyCollider(car);
 
-            Debug.Log($"[VehicleDressingTool] '{car.name}': 8 lamps placed from its own wheel geometry (track {measurements.halfWidth * 2f:0.00}m, wheelbase {measurements.frontZ - measurements.rearZ:0.00}m), horn wired.", car);
+            Debug.Log($"[VehicleDressingTool] '{car.name}': {headlightSurfaces.Length} headlight, {brakeSurfaces.Length} tail and {indicatorSurfaces.Length} indicator lens(es) found on the model; horn wired.", car);
         }
 
         // The material slots the garage will paint.
@@ -714,34 +702,6 @@ namespace CarParkingGame.EditorTools
             return true;
         }
 
-        private static GameObject CreateLamp(Transform parent, string name, Vector3 localPosition, Vector3 size, Material material)
-        {
-            GameObject lamp = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            lamp.name = name;
-            lamp.transform.SetParent(parent, false);
-            lamp.transform.localPosition = localPosition;
-            lamp.transform.localScale = new Vector3(
-                Mathf.Max(0.05f, size.x),
-                Mathf.Max(0.04f, size.y),
-                Mathf.Max(0.04f, size.z));
-
-            // Primitives ship with a collider; leaving it on would give the car phantom
-            // bumpers that collide with the world and register scoring penalties.
-            Collider collider = lamp.GetComponent<Collider>();
-
-            if (collider != null)
-            {
-                UnityEngine.Object.DestroyImmediate(collider);
-            }
-
-            var renderer = lamp.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-
-            lamp.SetActive(false);
-            return lamp;
-        }
 
         // Parented to the lamp root rather than to the lamp itself.
         //
@@ -770,7 +730,57 @@ namespace CarParkingGame.EditorTools
             return light;
         }
 
-        private static void SetLightGroup(SerializedObject serialized, string fieldName, GameObject[] glowObjects, Light[] lights)
+        // Which of the car's own material slots are lamp lenses, by the name the artist
+        // gave them. "Flicker" is what these packs call the indicator.
+        private static readonly string[] HeadlightWords = { "frontlight", "headlight" };
+        private static readonly string[] BrakeLightWords = { "brakelight", "rearlight", "taillight" };
+        // Not "flicker". These packs use FlickerLights for a headlight that flickers, and
+        // on two of the three cars lighting it lit the headlamps - or nothing visible at
+        // all. The amber lamp beside the headlight is the park light, where the model has
+        // one; where it does not, the car indicates on its tail lamps, which is what a car
+        // of this age does anyway.
+        private static readonly string[] IndicatorWords = { "parklight", "indicator", "turnsignal" };
+
+        private static LampSurface[] FindLampSurfaces(CarController car, string[] words)
+        {
+            var found = new List<LampSurface>();
+
+            foreach (Renderer renderer in car.GetComponentsInChildren<Renderer>(true))
+            {
+                // The LOD meshes carry the same material names and are never the one being
+                // drawn when the player is looking at their own car.
+                if (renderer.name.IndexOf("LOD", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    continue;
+                }
+
+                Material[] materials = renderer.sharedMaterials;
+
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    if (materials[i] == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (string word in words)
+                    {
+                        if (materials[i].name.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0)
+                        {
+                            continue;
+                        }
+
+                        found.Add(new LampSurface { renderer = renderer, materialIndex = i });
+                        break;
+                    }
+                }
+            }
+
+            return found.ToArray();
+        }
+
+        private static void SetLightGroup(SerializedObject serialized, string fieldName,
+            Light[] lights, LampSurface[] surfaces, Color litColor)
         {
             SerializedProperty group = serialized.FindProperty(fieldName);
 
@@ -782,25 +792,37 @@ namespace CarParkingGame.EditorTools
 
             SerializedProperty glowArray = group.FindPropertyRelative("glowObjects");
             SerializedProperty lightArray = group.FindPropertyRelative("lights");
+            SerializedProperty surfaceArray = group.FindPropertyRelative("surfaces");
+            SerializedProperty colorProperty = group.FindPropertyRelative("litColor");
 
-            if (glowArray == null || lightArray == null)
+            if (glowArray == null || lightArray == null || surfaceArray == null)
             {
                 Debug.LogWarning($"[VehicleDressingTool] '{fieldName}' does not look like a LightGroup.");
                 return;
             }
 
-            glowArray.arraySize = glowObjects.Length;
-
-            for (int i = 0; i < glowObjects.Length; i++)
-            {
-                glowArray.GetArrayElementAtIndex(i).objectReferenceValue = glowObjects[i];
-            }
+            // Nothing hung off the car any more; the lamps are the car's own.
+            glowArray.arraySize = 0;
 
             lightArray.arraySize = lights.Length;
 
             for (int i = 0; i < lights.Length; i++)
             {
                 lightArray.GetArrayElementAtIndex(i).objectReferenceValue = lights[i];
+            }
+
+            surfaceArray.arraySize = surfaces.Length;
+
+            for (int i = 0; i < surfaces.Length; i++)
+            {
+                SerializedProperty element = surfaceArray.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("renderer").objectReferenceValue = surfaces[i].renderer;
+                element.FindPropertyRelative("materialIndex").intValue = surfaces[i].materialIndex;
+            }
+
+            if (colorProperty != null)
+            {
+                colorProperty.colorValue = litColor;
             }
         }
 
@@ -856,37 +878,6 @@ namespace CarParkingGame.EditorTools
             property.objectReferenceValue = value;
         }
 
-        private static Material LoadOrCreateEmissiveMaterial(string name, Color color)
-        {
-            if (!AssetDatabase.IsValidFolder(MaterialFolder))
-            {
-                AssetDatabase.CreateFolder("Assets/GameAssets", "Materials");
-            }
-
-            string path = $"{MaterialFolder}/{name}.mat";
-            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-
-            if (existing != null)
-            {
-                return existing;
-            }
-
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
-
-            if (shader == null)
-            {
-                Debug.LogError("[VehicleDressingTool] Could not find an unlit shader for the lamp material.");
-                return null;
-            }
-
-            var material = new Material(shader);
-            material.SetColor("_BaseColor", color);
-            material.SetColor("_Color", color);
-
-            AssetDatabase.CreateAsset(material, path);
-            Debug.Log($"[VehicleDressingTool] Created lamp material '{path}'.");
-            return material;
-        }
 
         // A car horn is two close notes sounded together. Writing the PCM here keeps the
         // project free of downloaded audio and gives something obviously placeholder.
