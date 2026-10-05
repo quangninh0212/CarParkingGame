@@ -42,9 +42,16 @@ namespace CarParkingGame.Traffic
 
         private void ApplyState()
         {
+            // A head with no amber lamp shows red through the amber phase. That is what the
+            // phase means to a driver - stop if you can - and a two lamp head that went
+            // dark for the whole of it would read as a broken light rather than a changing
+            // one.
+            bool amber = state == TrafficLightState.Yellow;
+            bool hasAmberLamp = yellowGlow != null;
+
             SetGlow(greenGlow, state == TrafficLightState.Green);
-            SetGlow(yellowGlow, state == TrafficLightState.Yellow);
-            SetGlow(redGlow, state == TrafficLightState.Red);
+            SetGlow(yellowGlow, amber);
+            SetGlow(redGlow, state == TrafficLightState.Red || (amber && !hasAmberLamp));
         }
 
         private static void SetGlow(GameObject glow, bool on)
