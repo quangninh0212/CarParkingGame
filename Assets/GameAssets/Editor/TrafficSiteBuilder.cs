@@ -96,6 +96,8 @@ namespace CarParkingGame.EditorTools
                 return false;
             }
 
+            BuildRoadSurface(root.transform, lanes, site);
+
             WaypointPath path = BuildSnake(root.transform, lanes, site, out List<TrafficWaypoint> entrances);
 
             BuildLights(root.transform, entrances, site);
@@ -261,6 +263,42 @@ namespace CarParkingGame.EditorTools
             }
 
             return true;
+        }
+
+        // Asphalt under each street with a broken line down the middle of it.
+        //
+        // The streets were traffic driving over bare site slab. A surface and a centre line
+        // is what tells the player, over the wall of the lot they are parked in, that the
+        // thing out there is a road.
+        private static void BuildRoadSurface(Transform parent, List<float> lanes, Bounds site)
+        {
+            var host = new GameObject("Streets");
+            host.transform.SetParent(parent, false);
+
+            var kit = new MissionCourseKit();
+
+            float left = site.min.x - LaneEdgeMargin;
+            float right = site.max.x + LaneEdgeMargin;
+            float width = right - left;
+            float y = site.min.y;
+
+            const float RoadWidth = 7f;
+
+            foreach (float lane in lanes)
+            {
+                // Just proud of the slab, the way the bay paint is: level with it and the
+                // two surfaces fight for the same pixels.
+                GameObject road = kit.Spawn(MissionCourseKit.Part.Concrete, host.transform,
+                    new Vector3((left + right) * 0.5f, y + 0.03f, lane), 0f,
+                    new Vector3(width, 0.06f, RoadWidth));
+
+                MissionCourseKit.Tint(road, "SiteRoad", new Color(0.22f, 0.22f, 0.24f));
+
+                kit.PaintLine(host.transform,
+                    new Vector3(left + 2f, y + 0.06f, lane),
+                    new Vector3(right - 2f, y + 0.06f, lane),
+                    true, 0.22f, 3f, 3f);
+            }
         }
 
         // ----- the road ------------------------------------------------------------------

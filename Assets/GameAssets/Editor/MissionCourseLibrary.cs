@@ -99,6 +99,14 @@ namespace CarParkingGame.EditorTools
 
         private static void LotStart(Writer c, float x = 0f)
         {
+            // A line down the middle of every lane the course records as drivable. The
+            // floor was a black field with white boxes on it; these are what make it read
+            // as somewhere cars drive. Written beside the routes so the two cannot drift.
+            c.LaneLine(-15f, NearAisle, 15f, NearAisle);
+            c.LaneLine(-15f, FarAisle, 15f, FarAisle);
+            c.LaneLine(SideLane, NearAisle + 5f, SideLane, FarAisle - 5f);
+            c.LaneLine(-SideLane, NearAisle + 5f, -SideLane, FarAisle - 5f);
+
             c.Start(x, NearAisle);
 
             c.Route(new Vector2(-15f, NearAisle), new Vector2(15f, NearAisle));
@@ -128,6 +136,7 @@ namespace CarParkingGame.EditorTools
 
         private static void YardStart(Writer c, float x = 0f, float z = 19f)
         {
+            Ring(c, 9f, 10f, 28f);
             c.Start(x, z);
 
             // Once round the open middle: if any of it is shut, a car cannot get round.
@@ -158,6 +167,7 @@ namespace CarParkingGame.EditorTools
 
         private static void SquareStart(Writer c, float x = 0f)
         {
+            Ring(c, 9f, 12f, 30f);
             c.Start(x, 10f);
 
             c.Route(
@@ -190,7 +200,19 @@ namespace CarParkingGame.EditorTools
 
         private static void CircusStart(Writer c, float x = 0f)
         {
+            // The circus is driven round rather than along, so it gets a line round the
+            // outside of the ring instead of down a lane it does not have.
+            Ring(c, 16.5f, 6f, CircusCentreZ * 2f - 6f);
             c.Start(x, 4f);
+        }
+
+        // A broken line round the four sides of an open square, set in from the bays.
+        private static void Ring(Writer c, float halfWidth, float near, float far)
+        {
+            c.LaneLine(-halfWidth, near, halfWidth, near);
+            c.LaneLine(-halfWidth, far, halfWidth, far);
+            c.LaneLine(-halfWidth, near, -halfWidth, far);
+            c.LaneLine(halfWidth, near, halfWidth, far);
         }
 
         // ===== shape 5: the crossroads ======================================================
@@ -213,6 +235,7 @@ namespace CarParkingGame.EditorTools
 
         private static void CrossStart(Writer c, float x = -10f)
         {
+            Ring(c, 11.5f, 4f, 26f);
             c.Start(x, 4f);
 
             c.Route(
@@ -238,6 +261,7 @@ namespace CarParkingGame.EditorTools
 
         private static void AlleyStart(Writer c)
         {
+            c.LaneLine(0f, 5f, 0f, 44f);
             c.Start(0f, 6f);
             c.Route(new Vector2(0f, 5f), new Vector2(0f, 44f));
         }

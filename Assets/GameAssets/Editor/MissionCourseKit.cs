@@ -257,6 +257,53 @@ namespace CarParkingGame.EditorTools
             PaintArrowHead(bay, length * 0.64f, width * 0.5f, 0.55f, colour);
         }
 
+        // A painted line along the road, broken into dashes or drawn solid.
+        //
+        // The same flat strokes a bay is marked with. A car park floor with nothing on it
+        // but bay rectangles reads as a black field with white boxes on it; the lane lines
+        // are what make it read as somewhere cars drive.
+        public void PaintLine(Transform parent, Vector3 from, Vector3 to, bool dashed,
+            float width = 0.18f, float dashLength = 2.2f, float gapLength = 2.2f)
+        {
+            Vector3 along = to - from;
+            along.y = 0f;
+
+            float run = along.magnitude;
+
+            if (run < 0.1f)
+            {
+                return;
+            }
+
+            Vector3 direction = along / run;
+            float yaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+
+            if (!dashed)
+            {
+                Vector3 middle = (from + to) * 0.5f;
+                PaintStroke(parent, new Vector3(middle.x, middle.y + PaintLift, middle.z), yaw,
+                    new Vector3(width, PaintThickness, run), White);
+                return;
+            }
+
+            float step = dashLength + gapLength;
+            int dashes = Mathf.Max(1, Mathf.FloorToInt(run / step));
+
+            // Centred on the run, so a lane does not start with half a dash at one end and
+            // a full one at the other.
+            float used = dashes * step - gapLength;
+            float start = (run - used) * 0.5f;
+
+            for (int i = 0; i < dashes; i++)
+            {
+                float at = start + i * step + dashLength * 0.5f;
+                Vector3 centre = from + direction * at;
+
+                PaintStroke(parent, new Vector3(centre.x, centre.y + PaintLift, centre.z), yaw,
+                    new Vector3(width, PaintThickness, dashLength), White);
+            }
+        }
+
         // A lane arrow painted on the road, pointing along the parent's +Z: the same flat
         // strokes as a bay's arrow, in white so it reads as a direction marking rather
         // than as part of a bay.

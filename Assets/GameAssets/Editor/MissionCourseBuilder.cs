@@ -646,7 +646,10 @@ namespace CarParkingGame.EditorTools
         // metres with +Z forward from the entrance, which is what lets the layouts below
         public class CourseWriter
         {
-            private static readonly Color Tarmac = new Color(0.21f, 0.21f, 0.23f);
+            // Light enough to be a road surface rather than a hole. At 0.21 it read as
+            // black in the game, which is what a player called it: markings had nothing to
+            // sit on and the lot had no depth.
+            private static readonly Color Tarmac = new Color(0.30f, 0.30f, 0.33f);
             private static readonly Color Apron = new Color(0.34f, 0.34f, 0.36f);
 
             private readonly Transform root;
@@ -1027,6 +1030,12 @@ namespace CarParkingGame.EditorTools
             private MissionCourseKit.CarModel NextCar()
             {
                 return CarCycle[parked++ % CarCycle.Length];
+            }
+
+            // A broken white line down the middle of a driving lane.
+            public void LaneLine(float x1, float z1, float x2, float z2, bool dashed = true)
+            {
+                kit.PaintLine(root, new Vector3(x1, level, z1), new Vector3(x2, level, z2), dashed);
             }
 
             public void Arrow(float x, float z, float yaw)
