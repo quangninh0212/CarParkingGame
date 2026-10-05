@@ -492,6 +492,19 @@ namespace CarParkingGame.EditorTools
 
         private static void RemoveOldCourses()
         {
+            // The city and the streets used to be laid across the whole site. They are
+            // built into each course now, so the old site-wide objects have to go or the
+            // scene keeps both.
+            foreach (string stale in new[] { "SiteTraffic", "CitySurround" })
+            {
+                GameObject found = GameObject.Find(stale);
+
+                if (found != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(found);
+                }
+            }
+
             foreach (MissionAuthoring authoring in UnityEngine.Object.FindObjectsByType<MissionAuthoring>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
@@ -607,6 +620,7 @@ namespace CarParkingGame.EditorTools
                 // the whole lot over from the driving camera, high enough that the car stops
                 // against it instead of riding up and out.
                 writer.StripedRail(course.width, course.length);
+                writer.Surround();
             }
             else if (course.singleDeck)
             {
@@ -1036,6 +1050,285 @@ namespace CarParkingGame.EditorTools
             public void LaneLine(float x1, float z1, float x2, float z2, bool dashed = true)
             {
                 kit.PaintLine(root, new Vector3(x1, level, z1), new Vector3(x2, level, z2), dashed);
+            }
+
+            // A block of city round the lot: a ring road hard against the wall, buildings
+            // packed shoulder to shoulder outside it, a light on each corner and cars going
+            // round.
+            //
+            // Built into the course rather than across the site. Only one course is ever
+            // switched on, so only one block of city is ever loaded - and a ring that hugs
+            // the lot is what a player sees over a 1.15m wall, where a city scattered over
+            // four hundred metres was mostly out of sight and the rest of it floating.
+            public void Surround()
+            {
+                const float Verge = 1.5f;
+                const float RoadWidth = 8f;
+                const float Pavement = 2.5f;
+
+                float half = course.width * 0.5f;
+                float mid = RoadWidth * 0.5f;
+
+                // Centre line of the ring, which is what the road is drawn on, the cars
+                // drive along and the buildings stand back from.
+                float ringX = half + Verge + mid;
+                float ringNear = -(Verge + mid);
+                float ringFar = course.length + Verge + mid;
+
+                Road(0f, ringNear, course.width + (Verge + RoadWidth) * 2f, RoadWidth);
+                Road(0f, ringFar, course.width + (Verge + RoadWidth) * 2f, RoadWidth);
+                Road(-ringX, course.length * 0.5f, RoadWidth, course.length + (Verge + RoadWidth) * 2f);
+                Road(ringX, course.length * 0.5f, RoadWidth, course.length + (Verge + RoadWidth) * 2f);
+
+                float blockX = ringX + mid + Pavement;
+                float blockNear = ringNear - mid - Pavement;
+                float blockFar = ringFar + mid + Pavement;
+
+                Buildings(-blockX, blockNear, -blockX, blockFar, 90f);
+                Buildings(blockX, blockNear, blockX, blockFar, 270f);
+                Buildings(-blockX, blockNear, blockX, blockNear, 0f);
+                Buildings(-blockX, blockFar, blockX, blockFar, 180f);
+
+                RingTraffic(ringX, ringNear, ringFar);
+            }
+
+            private void Road(float x, float z, float width, float length)
+            {
+                GameObject slab = kit.Spawn(MissionCourseKit.Part.Concrete, root,
+                    new Vector3(x, level + 0.03f, z), 0f, new Vector3(width, 0.06f, length));
+
+                MissionCourseKit.Tint(slab, "SiteRoad", new Color(0.24f, 0.24f, 0.26f));
+
+                // A line down the middle, the long way. Without one the ring is a dark band
+                // against dark tarmac and reads as nothing at all.
+                bool alongX = width > length;
+
+                Vector3 from = alongX
+                    ? new Vector3(x - width * 0.5f + 3f, level + 0.06f, z)
+                    : new Vector3(x, level + 0.06f, z - length * 0.5f + 3f);
+
+                Vector3 to = alongX
+                    ? new Vector3(x + width * 0.5f - 3f, level + 0.06f, z)
+                    : new Vector3(x, level + 0.06f, z + length * 0.5f - 3f);
+
+                kit.PaintLine(root, from, to, true, 0.2f, 2.6f, 2.6f);
+            }
+
+            // Shoulder to shoulder along one side, facing the road.
+            private void Buildings(float x1, float z1, float x2, float z2, float facing)
+            {
+                List<CityChunkLibrary.Building> stock = Stock();
+
+                if (stock.Count == 0)
+                {
+                    return;
+                }
+
+                var from = new Vector2(x1, z1);
+                var to = new Vector2(x2, z2);
+
+                float run = (to - from).magnitude;
+                Vector2 step = (to - from) / run;
+
+                float along = 0f;
+
+                while (along < run)
+                {
+                    CityChunkLibrary.Building building = stock[surroundRandom.Next(stock.Count)];
+
+                    // Turned to face the road, so its front is what the player sees. Its
+                    // width along the row is then its own depth or breadth depending on the
+                    // turn, so the step is taken from the turned footprint.
+                    float width = Mathf.Abs(facing % 180f) < 1f ? building.size.x : building.size.z;
+                    width = Mathf.Max(6f, width);
+
+                    if (along + width > run + width * 0.5f)
+                    {
+                        break;
+                    }
+
+                    Vector2 at = from + step * (along + width * 0.5f);
+
+                    var block = new GameObject("Building");
+                    block.transform.SetParent(root, false);
+                    block.transform.localPosition = new Vector3(at.x, level, at.y);
+                    block.transform.localRotation = Quaternion.Euler(0f, facing, 0f);
+
+                    block.AddComponent<MeshFilter>().sharedMesh = building.mesh;
+
+                    var renderer = block.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterials = building.materials;
+
+                    // Backdrop: a skyline the player cannot reach is not worth shadowing,
+                    // and it has no collider because nothing can get to it anyway.
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    renderer.receiveShadows = false;
+
+                    along += width + 0.6f;
+                }
+            }
+
+            // Cars going round the ring, with a light on each corner.
+            private void RingTraffic(float ringX, float ringNear, float ringFar)
+            {
+                var host = new GameObject("RingTraffic");
+                host.transform.SetParent(root, false);
+
+                var path = host.AddComponent<CarParkingGame.Traffic.WaypointPath>();
+                var points = new List<Transform>();
+
+                var corners = new[]
+                {
+                    new Vector2(-ringX, ringNear),
+                    new Vector2(ringX, ringNear),
+                    new Vector2(ringX, ringFar),
+                    new Vector2(-ringX, ringFar)
+                };
+
+                var lights = new List<CarParkingGame.Traffic.TrafficLight>();
+                var lightPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrafficLightGenerator.PrefabPath);
+
+                for (int i = 0; i < corners.Length; i++)
+                {
+                    Vector2 from = corners[i];
+                    Vector2 to = corners[(i + 1) % corners.Length];
+
+                    int steps = Mathf.Max(2, Mathf.CeilToInt((to - from).magnitude / 10f));
+
+                    for (int step = 0; step < steps; step++)
+                    {
+                        Vector2 at = Vector2.Lerp(from, to, step / (float)steps);
+
+                        var point = new GameObject($"Waypoint {points.Count:00}");
+                        point.transform.SetParent(host.transform, false);
+                        point.transform.localPosition = new Vector3(at.x, level, at.y);
+
+                        var data = point.AddComponent<CarParkingGame.Traffic.TrafficWaypoint>();
+                        points.Add(point.transform);
+
+                        // A light on the approach to each corner, and the two pairs across
+                        // from each other share a phase so one way is moving while the
+                        // other waits.
+                        if (step == steps - 2 && lightPrefab != null)
+                        {
+                            var head = (GameObject)PrefabUtility.InstantiatePrefab(lightPrefab, host.transform);
+                            head.transform.localPosition = point.transform.localPosition;
+                            head.transform.localRotation = Quaternion.Euler(0f, i * 90f, 0f);
+
+                            var light = head.GetComponent<CarParkingGame.Traffic.TrafficLight>();
+                            lights.Add(light);
+
+                            var waypoint = new SerializedObject(data);
+                            waypoint.FindProperty("governingLight").objectReferenceValue = light;
+                            waypoint.FindProperty("isCrossing").boolValue = true;
+                            waypoint.ApplyModifiedProperties();
+                        }
+                    }
+                }
+
+                var serialized = new SerializedObject(path);
+                SerializedProperty array = serialized.FindProperty("waypoints");
+                array.arraySize = points.Count;
+
+                for (int i = 0; i < points.Count; i++)
+                {
+                    array.GetArrayElementAtIndex(i).objectReferenceValue = points[i];
+                }
+
+                serialized.FindProperty("loop").boolValue = true;
+                serialized.ApplyModifiedProperties();
+
+                Lights(host.transform, lights);
+                Cars(host.transform, path);
+            }
+
+            private void Lights(Transform host, List<CarParkingGame.Traffic.TrafficLight> lights)
+            {
+                if (lights.Count == 0)
+                {
+                    return;
+                }
+
+                var group = host.gameObject.AddComponent<CarParkingGame.Traffic.TrafficLightGroup>();
+                var serialized = new SerializedObject(group);
+                SerializedProperty phases = serialized.FindProperty("phases");
+
+                phases.arraySize = 2;
+
+                for (int phase = 0; phase < 2; phase++)
+                {
+                    SerializedProperty entry = phases.GetArrayElementAtIndex(phase);
+                    entry.FindPropertyRelative("name").stringValue = phase == 0 ? "Across" : "Along";
+
+                    SerializedProperty array = entry.FindPropertyRelative("lights");
+                    var mine = new List<CarParkingGame.Traffic.TrafficLight>();
+
+                    for (int i = phase; i < lights.Count; i += 2)
+                    {
+                        mine.Add(lights[i]);
+                    }
+
+                    array.arraySize = mine.Count;
+
+                    for (int i = 0; i < mine.Count; i++)
+                    {
+                        array.GetArrayElementAtIndex(i).objectReferenceValue = mine[i];
+                    }
+                }
+
+                serialized.ApplyModifiedProperties();
+            }
+
+            private void Cars(Transform host, CarParkingGame.Traffic.WaypointPath path)
+            {
+                var prefabs = new List<CarParkingGame.Traffic.TrafficVehicle>();
+
+                foreach (string name in new[] { "Traffic_SEDAN", "Traffic_HATCHBACK_1988", "Traffic_ClassicCarFull" })
+                {
+                    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                        $"Assets/GameAssets/Prefabs/Traffic/{name}.prefab");
+
+                    if (prefab != null && prefab.GetComponent<CarParkingGame.Traffic.TrafficVehicle>() != null)
+                    {
+                        prefabs.Add(prefab.GetComponent<CarParkingGame.Traffic.TrafficVehicle>());
+                    }
+                }
+
+                if (prefabs.Count == 0)
+                {
+                    return;
+                }
+
+                var pool = new GameObject("Pool");
+                pool.transform.SetParent(host, false);
+
+                var manager = host.gameObject.AddComponent<CarParkingGame.Traffic.TrafficManager>();
+                var serialized = new SerializedObject(manager);
+
+                SerializedProperty cars = serialized.FindProperty("vehiclePrefabs");
+                cars.arraySize = prefabs.Count;
+
+                for (int i = 0; i < prefabs.Count; i++)
+                {
+                    cars.GetArrayElementAtIndex(i).objectReferenceValue = prefabs[i];
+                }
+
+                SerializedProperty paths = serialized.FindProperty("paths");
+                paths.arraySize = 1;
+                paths.GetArrayElementAtIndex(0).objectReferenceValue = path;
+
+                // A short ring holds few cars before they are nose to tail.
+                serialized.FindProperty("maximumVehicles").intValue = 6;
+                serialized.FindProperty("poolParent").objectReferenceValue = pool.transform;
+                serialized.ApplyModifiedProperties();
+            }
+
+            private static List<CityChunkLibrary.Building> cachedStock;
+            private readonly System.Random surroundRandom = new System.Random(20261006);
+
+            private static List<CityChunkLibrary.Building> Stock()
+            {
+                return cachedStock ??= CityChunkLibrary.Load();
             }
 
             public void Arrow(float x, float z, float yaw)
