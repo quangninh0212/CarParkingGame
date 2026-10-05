@@ -275,15 +275,6 @@ namespace CarParkingGame.Vehicle
 
             leftIndicator.SetState(indicator == IndicatorSide.Left && indicatorVisible);
             rightIndicator.SetState(indicator == IndicatorSide.Right && indicatorVisible);
-
-            // A car with no park lamp indicates on its tail lamps, which means the
-            // indicator and the brake can be driving the same lens. The indicator wins
-            // while it is lit; when it blinks off, the brake has to be told again, or
-            // signalling would leave the brake lights dark.
-            if (!indicatorVisible)
-            {
-                brakeLights.SetState(brakeLightsOn);
-            }
         }
     }
 }

@@ -165,13 +165,24 @@ namespace CarParkingGame.EditorTools
 
             LampSurface[] headlightSurfaces = FindLampSurfaces(car, HeadlightWords);
             LampSurface[] brakeSurfaces = FindLampSurfaces(car, BrakeLightWords);
-            LampSurface[] indicatorSurfaces = FindLampSurfaces(car, IndicatorWords);
+            // Indicators have to be one side at a time, and a material cannot do that: the
+            // left and right lamps of a car share one, so tinting it flashes both sides at
+            // once. A lamp's two halves are separable in the geometry though, so each side
+            // gets a marker cut to the shape of the lens it covers.
+            LampSurface[] frontIndicatorLens = FindLampSurfaces(car, IndicatorWords);
 
-            if (indicatorSurfaces.Length == 0)
+            if (frontIndicatorLens.Length == 0)
             {
-                indicatorSurfaces = brakeSurfaces;
-                Debug.Log($"[VehicleDressingTool] '{car.name}' has no park lamp, so it indicates on its tail lamps.", car);
+                frontIndicatorLens = headlightSurfaces;
             }
+
+            Material amber = LoadOrCreateLampMaterial("LampIndicator", IndicatorColor);
+
+            var leftMarkers = new List<GameObject>();
+            var rightMarkers = new List<GameObject>();
+
+            AddSideMarkers(car, lampRoot.transform, frontIndicatorLens, "IndicatorFront", amber, leftMarkers, rightMarkers);
+            AddSideMarkers(car, lampRoot.transform, brakeSurfaces, "IndicatorRear", amber, leftMarkers, rightMarkers);
 
             VehicleLights lights = car.GetComponent<VehicleLights>();
 
@@ -183,14 +194,13 @@ namespace CarParkingGame.EditorTools
             var serialized = new SerializedObject(lights);
             SetObject(serialized, "car", car);
 
-            // Both indicators share the car's one set of indicator lenses. These models do
-            // not separate left from right, so a left signal lights the same glass as a
-            // right one - the flashing says the car is indicating, and the on-screen arrow
-            // says which way.
-            SetLightGroup(serialized, "headlights", new[] { spotLeft, spotRight }, headlightSurfaces, HeadlightColor);
-            SetLightGroup(serialized, "brakeLights", Array.Empty<Light>(), brakeSurfaces, BrakeColor);
-            SetLightGroup(serialized, "leftIndicator", Array.Empty<Light>(), indicatorSurfaces, IndicatorColor);
-            SetLightGroup(serialized, "rightIndicator", Array.Empty<Light>(), indicatorSurfaces, IndicatorColor);
+            SetLightGroup(serialized, "headlights", new[] { spotLeft, spotRight }, headlightSurfaces, HeadlightColor, Array.Empty<GameObject>());
+            SetLightGroup(serialized, "brakeLights", Array.Empty<Light>(), brakeSurfaces, BrakeColor, Array.Empty<GameObject>());
+
+            // Markers rather than a tinted material, so a left signal is the left pair and
+            // nothing else. They also keep clear of the brake, which owns the tail lens.
+            SetLightGroup(serialized, "leftIndicator", Array.Empty<Light>(), Array.Empty<LampSurface>(), IndicatorColor, leftMarkers.ToArray());
+            SetLightGroup(serialized, "rightIndicator", Array.Empty<Light>(), Array.Empty<LampSurface>(), IndicatorColor, rightMarkers.ToArray());
 
             serialized.ApplyModifiedProperties();
 
@@ -209,7 +219,7 @@ namespace CarParkingGame.EditorTools
             MeasureViewPoints(car);
             FitBodyCollider(car);
 
-            Debug.Log($"[VehicleDressingTool] '{car.name}': {headlightSurfaces.Length} headlight, {brakeSurfaces.Length} tail and {indicatorSurfaces.Length} indicator lens(es) found on the model; horn wired.", car);
+            Debug.Log($"[VehicleDressingTool] '{car.name}': {headlightSurfaces.Length} headlight and {brakeSurfaces.Length} tail lens(es) on the model, {leftMarkers.Count} left and {rightMarkers.Count} right indicator marker(s); horn wired.", car);
         }
 
         // The material slots the garage will paint.
@@ -779,8 +789,170 @@ namespace CarParkingGame.EditorTools
             return found.ToArray();
         }
 
+        // A marker per side of a lamp, cut to the half of the lens it sits on.
+        //
+        // The lens is one mesh covering both sides of the car, so it cannot be lit one
+        // side at a time - but its triangles can be read, split down the middle of the
+        // body, and measured. A marker sized and placed from that half sits exactly where
+        // the lamp is, which is what keeps it from looking like something bolted on.
+        private static void AddSideMarkers(CarController car, Transform lampRoot, LampSurface[] lenses,
+            string name, Material material, List<GameObject> left, List<GameObject> right)
+        {
+            foreach (LampSurface lens in lenses)
+            {
+                if (!TryMeasureLensHalves(car, lens, out Bounds leftHalf, out Bounds rightHalf))
+                {
+                    continue;
+                }
+
+                left.Add(CreateLensMarker(lampRoot, name + "Left" + left.Count, OuterLamp(leftHalf, -1f), material));
+                right.Add(CreateLensMarker(lampRoot, name + "Right" + right.Count, OuterLamp(rightHalf, 1f), material));
+            }
+        }
+
+        // The lamp's triangles, in the car's own space, split into the half left of the
+        // body's centre line and the half right of it.
+        private static bool TryMeasureLensHalves(CarController car, LampSurface lens, out Bounds left, out Bounds right)
+        {
+            left = default;
+            right = default;
+
+            if (lens?.renderer == null)
+            {
+                return false;
+            }
+
+            var filter = lens.renderer.GetComponent<MeshFilter>();
+            Mesh mesh = filter != null ? filter.sharedMesh : null;
+
+            if (mesh == null || lens.materialIndex < 0 || lens.materialIndex >= mesh.subMeshCount)
+            {
+                return false;
+            }
+
+            float middle = CarParkingGame.Vehicle.VehicleViewPoints.TryMeasureBodyBounds(car.transform, out Bounds body)
+                ? body.center.x
+                : 0f;
+
+            Vector3[] vertices = mesh.vertices;
+            int[] triangles = mesh.GetTriangles(lens.materialIndex);
+
+            bool anyLeft = false;
+            bool anyRight = false;
+
+            foreach (int index in triangles)
+            {
+                Vector3 inCar = car.transform.InverseTransformPoint(
+                    lens.renderer.transform.TransformPoint(vertices[index]));
+
+                if (inCar.x < middle)
+                {
+                    Encapsulate(ref left, ref anyLeft, inCar);
+                }
+                else
+                {
+                    Encapsulate(ref right, ref anyRight, inCar);
+                }
+            }
+
+            return anyLeft && anyRight;
+        }
+
+        private static void Encapsulate(ref Bounds bounds, ref bool any, Vector3 point)
+        {
+            if (!any)
+            {
+                bounds = new Bounds(point, Vector3.zero);
+                any = true;
+                return;
+            }
+
+            bounds.Encapsulate(point);
+        }
+
+        // The outermost lamp of a half, which is where the indicator is on a car with a
+        // row of them across the back. A half that is much wider than it is tall is a row
+        // rather than a single lamp, and covering the whole row turns four round lamps
+        // into one amber blob; a half that is roughly square is one lamp already and is
+        // left alone.
+        private static Bounds OuterLamp(Bounds half, float outward)
+        {
+            if (half.size.x <= half.size.y * 1.8f)
+            {
+                return half;
+            }
+
+            const float Share = 0.45f;
+
+            float width = half.size.x * Share;
+            float edge = outward > 0f ? half.max.x : half.min.x;
+            float centre = edge - outward * width * 0.5f;
+
+            return new Bounds(
+                new Vector3(centre, half.center.y, half.center.z),
+                new Vector3(width, half.size.y, half.size.z));
+        }
+
+        // Sized to the lens and sat on it. A shade larger, so it covers the glass rather
+        // than hiding inside it, and never larger than the lamp it belongs to.
+        private static GameObject CreateLensMarker(Transform lampRoot, string name, Bounds half, Material material)
+        {
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            marker.name = name;
+            marker.transform.SetParent(lampRoot, false);
+            marker.transform.localPosition = half.center;
+
+            Vector3 size = half.size * 1.04f;
+
+            marker.transform.localScale = new Vector3(
+                Mathf.Max(0.04f, size.x),
+                Mathf.Max(0.04f, size.y),
+                Mathf.Max(0.04f, size.z));
+
+            // Primitives ship with a collider; leaving it on would give the car phantom
+            // bumpers that collide with the world and register scoring penalties.
+            Collider collider = marker.GetComponent<Collider>();
+
+            if (collider != null)
+            {
+                UnityEngine.Object.DestroyImmediate(collider);
+            }
+
+            var renderer = marker.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            marker.SetActive(false);
+            return marker;
+        }
+
+        private static Material LoadOrCreateLampMaterial(string name, Color color)
+        {
+            string path = $"Assets/GameAssets/Materials/{name}.mat";
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var material = new Material(shader) { name = name };
+
+            material.SetColor("_BaseColor", color);
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", color * 2f);
+            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+
+            Directory.CreateDirectory("Assets/GameAssets/Materials");
+            AssetDatabase.CreateAsset(material, path);
+
+            return material;
+        }
+
         private static void SetLightGroup(SerializedObject serialized, string fieldName,
-            Light[] lights, LampSurface[] surfaces, Color litColor)
+            Light[] lights, LampSurface[] surfaces, Color litColor, GameObject[] glowObjects)
         {
             SerializedProperty group = serialized.FindProperty(fieldName);
 
@@ -801,8 +973,12 @@ namespace CarParkingGame.EditorTools
                 return;
             }
 
-            // Nothing hung off the car any more; the lamps are the car's own.
-            glowArray.arraySize = 0;
+            glowArray.arraySize = glowObjects.Length;
+
+            for (int i = 0; i < glowObjects.Length; i++)
+            {
+                glowArray.GetArrayElementAtIndex(i).objectReferenceValue = glowObjects[i];
+            }
 
             lightArray.arraySize = lights.Length;
 
