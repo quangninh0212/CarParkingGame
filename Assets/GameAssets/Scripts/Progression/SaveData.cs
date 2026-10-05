@@ -71,6 +71,9 @@ namespace CarParkingGame.Progression
         // How far the last challenge run got, so quitting one and coming back resumes it
         // rather than starting again at stage one. Zero means there is no run to resume.
         public int challengeStage;
+
+        // Whether the opening has been read. Shown once, then only on request.
+        public bool prologueSeen;
         public GameMode lastGameMode = GameMode.MainMenu;
         public List<CarSaveEntry> cars = new List<CarSaveEntry>();
         public List<MissionProgressData> missions = new List<MissionProgressData>();

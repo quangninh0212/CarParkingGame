@@ -118,6 +118,7 @@ namespace CarParkingGame.EditorTools
             yield return new KeyValuePair<string, ShowroomFocus>("PracticeScreen", ShowroomFocus.Home);
             yield return new KeyValuePair<string, ShowroomFocus>("GarageScreen", ShowroomFocus.Garage);
             yield return new KeyValuePair<string, ShowroomFocus>("SettingsScreen", ShowroomFocus.Home);
+            yield return new KeyValuePair<string, ShowroomFocus>("StoryScreen", ShowroomFocus.Home);
         }
 
         private static Camera PrepareCamera(int width, int height)
@@ -237,6 +238,22 @@ namespace CarParkingGame.EditorTools
             // The mirror only renders while a car is being driven, which does not happen in
             // the editor, so the shot shows the empty glass. It is here to check that the
             // frame sits where a driver would look for it and does not cover the HUD.
+            Transform banner = hud.Find("ChapterBanner");
+
+            if (banner != null)
+            {
+                banner.gameObject.SetActive(true);
+                SetText(banner.Find("Title"), "CHAPTER 2  -  FIRST JOB");
+                SetText(banner.Find("Line"), "The licence is signed. A car park on the edge of town needs somebody who can read a bay before they fill it.");
+
+                var group = banner.GetComponent<CanvasGroup>();
+
+                if (group != null)
+                {
+                    group.alpha = 1f;
+                }
+            }
+
             Transform mirrors = hud.Find("RearMirrors");
 
             if (mirrors != null)

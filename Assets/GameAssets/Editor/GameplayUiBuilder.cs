@@ -3,6 +3,7 @@ using CarParkingGame.Core;
 using CarParkingGame.Garage;
 using CarParkingGame.Missions;
 using CarParkingGame.Settings;
+using CarParkingGame.Story;
 using CarParkingGame.UI;
 using CarParkingGame.Vehicle;
 using SimpleInputNamespace;
@@ -261,6 +262,7 @@ namespace CarParkingGame.EditorTools
             BuildHudReadouts(hud, out Text missionName, out Text score, out Text coins, out Text timer, out GameObject timerChip);
             BuildBayCounter(hud, out Text bayCount, out GameObject bayChip);
             BuildRearViewMirror(hud);
+            BuildChapterBanner(hud);
             BuildSpeedometer(hud);
             BuildParkingFeedback(hud, out Image indicator, out Image progress, out Text hint);
             BuildGuideArrow(hud);
@@ -613,7 +615,8 @@ namespace CarParkingGame.EditorTools
             GameObject root = CreateChild(parent, "MenuRoot");
             Stretch(root);
 
-            GameObject home = BuildHomeScreen(root.transform, out Button play, out Button mode, out Button garage, out Button settings, out Button quit, out Text coins);
+            GameObject home = BuildHomeScreen(root.transform, out Button play, out Button story, out Button mode, out Button garage, out Button settings, out Button quit, out Text coins);
+            BuildStoryScreen(root.transform, story);
             GameObject modeScreen = BuildModeScreen(root.transform, out Button practiceMode, out Button challengeMode, out Button freeMode, out Button modeBack);
             GameObject practiceScreen = BuildPracticeScreen(root.transform, out Button practiceBack);
             GameObject garageScreen = BuildGarageScreen(root.transform, out Button garageBack);
@@ -651,6 +654,7 @@ namespace CarParkingGame.EditorTools
         private static GameObject BuildHomeScreen(
             Transform parent,
             out Button play,
+            out Button story,
             out Button mode,
             out Button garage,
             out Button settings,
@@ -678,11 +682,12 @@ namespace CarParkingGame.EditorTools
             coins = CreateLabel(chip.transform, "Coins", "0", 32, TextAnchor.MiddleLeft);
             SetRect(coins.rectTransform, new Vector2(0f, 0.5f), new Vector2(72f, 0f), new Vector2(130f, 40f), new Vector2(0f, 0.5f));
 
-            play = HomeButton(screen.transform, "PlayButton", "play", "PLAY", 236f, AccentColor, 110f);
-            mode = HomeButton(screen.transform, "ModeButton", "compass", "GAME MODE", 116f, ButtonColor, 92f);
-            garage = HomeButton(screen.transform, "GarageButton", "car", "GARAGE", 12f, ButtonColor, 92f);
-            settings = HomeButton(screen.transform, "SettingsButton", "gear", "SETTINGS", -92f, ButtonColor, 92f);
-            quit = HomeButton(screen.transform, "QuitButton", "exit", "QUIT", -196f, ButtonColor, 92f);
+            play = HomeButton(screen.transform, "PlayButton", "play", "PLAY", 250f, AccentColor, 110f);
+            story = HomeButton(screen.transform, "StoryButton", "star", "STORY", 150f, ButtonColor, 86f);
+            mode = HomeButton(screen.transform, "ModeButton", "compass", "GAME MODE", 56f, ButtonColor, 86f);
+            garage = HomeButton(screen.transform, "GarageButton", "car", "GARAGE", -38f, ButtonColor, 86f);
+            settings = HomeButton(screen.transform, "SettingsButton", "gear", "SETTINGS", -132f, ButtonColor, 86f);
+            quit = HomeButton(screen.transform, "QuitButton", "exit", "QUIT", -226f, ButtonColor, 86f);
 
             return screen;
         }
@@ -1069,6 +1074,77 @@ namespace CarParkingGame.EditorTools
             }
 
             Debug.Log($"[GameplayUiBuilder] Music '{clip.name}' ({clip.length:0}s) wired to the music slider.");
+        }
+
+        // The opening, over the home screen. Shown once by itself on a new save, and
+        // after that only when the player asks for it.
+        private static void BuildStoryScreen(Transform parent, Button openButton)
+        {
+            GameObject screen = CreateChild(parent, "StoryScreen");
+            Stretch(screen);
+
+            Image dim = CreateImage(screen.transform, "Dim", Dim);
+            Stretch(dim.gameObject);
+
+            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180f, 760f), PanelColor);
+
+            Text title = CreateLabel(panel.transform, "Title", StoryLibrary.PrologueTitle, 52, TextAnchor.MiddleCenter);
+            SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -84f), new Vector2(1000f, 64f), new Vector2(0.5f, 0.5f));
+
+            // Written into the scene rather than left for the view to fill at runtime, so
+            // what is in the project is what the player reads - and so a screenshot of this
+            // screen shows the words rather than an empty panel.
+            Text body = CreateLabel(panel.transform, "Body", StoryLibrary.PrologueText, 30, TextAnchor.UpperLeft);
+            body.color = new Color(1f, 1f, 1f, 0.88f);
+
+            // Wrapped. Labels on this canvas run off their rect by default, which suits a
+            // score or a speed and makes a paragraph run off the side of the panel.
+            Wrap(body);
+            SetRect(body.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -400f), new Vector2(1020f, 520f), new Vector2(0.5f, 0.5f));
+
+            Button go = WideButton(panel.transform, "ContinueButton", "CONTINUE", new Vector2(0.5f, 0f), new Vector2(0f, 78f), new Vector2(420f, 88f), AccentColor);
+
+            var view = screen.AddComponent<StoryIntroView>();
+            SetPrivate(view, "panel", screen);
+            SetPrivate(view, "titleLabel", title);
+            SetPrivate(view, "bodyLabel", body);
+            SetPrivate(view, "continueButton", go);
+            SetPrivate(view, "openButton", openButton);
+
+            // The view switches it on; MenuController must not, or backing out of any
+            // other screen would reopen the story.
+            screen.SetActive(false);
+        }
+
+        // The chapter title, across the top of the play screen for a few seconds.
+        private static void BuildChapterBanner(GameObject hud)
+        {
+            GameObject banner = CreateChild(hud.transform, "ChapterBanner");
+            SetRect(banner.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 170f), new Vector2(1500f, 220f), new Vector2(0.5f, 0.5f));
+
+            var group = banner.AddComponent<CanvasGroup>();
+
+            // Reads over the level rather than blocking it: no background panel, and no
+            // taps swallowed from the driving controls underneath.
+            group.blocksRaycasts = false;
+            group.interactable = false;
+
+            Text title = CreateLabel(banner.transform, "Title", "CHAPTER", 56, TextAnchor.MiddleCenter);
+            SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(1420f, 72f), new Vector2(0.5f, 0.5f));
+
+            Text line = CreateLabel(banner.transform, "Line", string.Empty, 28, TextAnchor.UpperCenter);
+            line.color = new Color(1f, 1f, 1f, 0.85f);
+            Wrap(line);
+            SetRect(line.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(1320f, 110f), new Vector2(0.5f, 0.5f));
+
+            var view = hud.AddComponent<ChapterBanner>();
+            SetPrivate(view, "missions", Object.FindFirstObjectByType<MissionManager>(FindObjectsInactive.Include));
+            SetPrivate(view, "group", group);
+            SetPrivate(view, "titleLabel", title);
+            SetPrivate(view, "lineLabel", line);
+
+            banner.SetActive(false);
         }
 
         // The black that a challenge run swaps levels behind. Built last so it is the last
@@ -1518,6 +1594,13 @@ namespace CarParkingGame.EditorTools
 
             SetRect(image.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.one * size, new Vector2(0.5f, 0.5f));
             return image;
+        }
+
+        // For a label holding a sentence rather than a number.
+        private static void Wrap(Text label)
+        {
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.verticalOverflow = VerticalWrapMode.Truncate;
         }
 
         private static Text CreateLabel(Transform parent, string name, string content, int fontSize, TextAnchor alignment)
