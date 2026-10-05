@@ -29,7 +29,10 @@ namespace CarParkingGame.EditorTools
         private const string ImpactSourceName = "ImpactAudio";
         private const string BrakeSourceName = "BrakeAudio";
 
+        private const string IndicatorSourceName = "IndicatorAudio";
+
         private const string CrashClipPath = "Assets/GameAssets/Audio/car_crash.mp3";
+        private const string IndicatorClipPath = "Assets/GameAssets/Audio/tieng-xi-nhan.mp3";
         private const string BrakeClipPath = "Assets/GameAssets/Audio/car-braking.mp3";
         private const string LampParentName = "PlaceholderLights";
 
@@ -142,14 +145,26 @@ namespace CarParkingGame.EditorTools
             float noseZ = haveBody ? body.max.z : measurements.frontZ + measurements.overhang;
             float tailZ = haveBody ? body.min.z : measurements.rearZ - measurements.overhang;
 
-            // Lamps sit a little proud of the bodywork so they are not buried in the mesh.
-            const float Proud = 0.04f;
+            // Lamp units, not dots.
+            //
+            // These were spheres, which from the driving camera read as a bead stuck on the
+            // nose rather than as a headlight. A wide, shallow box set half into the
+            // bodywork reads as a lamp pressed into the panel, which is what a lamp is.
+            const float Depth = 0.1f;
 
-            float lampSize = halfBodyWidth * 0.2f;
-            float sideX = halfBodyWidth * 0.66f;
-            float cornerX = halfBodyWidth * 0.92f;
-            float frontZ = noseZ + Proud;
-            float rearZ = tailZ - Proud;
+            // Half in, half out. Fully proud and it is a lump bolted to the front; fully
+            // sunk and the body hides it.
+            float frontZ = noseZ + 0.01f;
+            float rearZ = tailZ - 0.01f;
+
+            var headlightSize = new Vector3(halfBodyWidth * 0.38f, halfBodyWidth * 0.21f, Depth);
+            var brakeSize = new Vector3(halfBodyWidth * 0.38f, halfBodyWidth * 0.19f, Depth);
+            var indicatorSize = new Vector3(halfBodyWidth * 0.16f, halfBodyWidth * 0.17f, Depth);
+
+            // The main lamps inboard, the indicators out at the corners, with a gap - they
+            // are separate lamps on a real car and running them together loses both.
+            float sideX = halfBodyWidth * 0.56f;
+            float cornerX = halfBodyWidth * 0.86f;
 
             // Headlamp height: a third of the way up the body, which is where a bumper
             // lamp sits on all three of these cars.
@@ -157,22 +172,22 @@ namespace CarParkingGame.EditorTools
                 ? body.min.y + body.size.y * 0.34f
                 : measurements.wheelY + measurements.halfWidth * 0.55f;
 
-            GameObject headlightLeft = CreateLamp(lampRoot.transform, "HeadlightLeft", new Vector3(centreX - sideX, lampY, frontZ), lampSize, headlightMaterial);
-            GameObject headlightRight = CreateLamp(lampRoot.transform, "HeadlightRight", new Vector3(centreX + sideX, lampY, frontZ), lampSize, headlightMaterial);
+            GameObject headlightLeft = CreateLamp(lampRoot.transform, "HeadlightLeft", new Vector3(centreX - sideX, lampY, frontZ), headlightSize, headlightMaterial);
+            GameObject headlightRight = CreateLamp(lampRoot.transform, "HeadlightRight", new Vector3(centreX + sideX, lampY, frontZ), headlightSize, headlightMaterial);
 
-            GameObject brakeLeft = CreateLamp(lampRoot.transform, "BrakeLeft", new Vector3(centreX - sideX, lampY, rearZ), lampSize, brakeMaterial);
-            GameObject brakeRight = CreateLamp(lampRoot.transform, "BrakeRight", new Vector3(centreX + sideX, lampY, rearZ), lampSize, brakeMaterial);
+            GameObject brakeLeft = CreateLamp(lampRoot.transform, "BrakeLeft", new Vector3(centreX - sideX, lampY, rearZ), brakeSize, brakeMaterial);
+            GameObject brakeRight = CreateLamp(lampRoot.transform, "BrakeRight", new Vector3(centreX + sideX, lampY, rearZ), brakeSize, brakeMaterial);
 
-            GameObject indicatorFrontLeft = CreateLamp(lampRoot.transform, "IndicatorFrontLeft", new Vector3(centreX - cornerX, lampY, frontZ - lampSize), lampSize * 0.8f, indicatorMaterial);
-            GameObject indicatorRearLeft = CreateLamp(lampRoot.transform, "IndicatorRearLeft", new Vector3(centreX - cornerX, lampY, rearZ + lampSize), lampSize * 0.8f, indicatorMaterial);
-            GameObject indicatorFrontRight = CreateLamp(lampRoot.transform, "IndicatorFrontRight", new Vector3(centreX + cornerX, lampY, frontZ - lampSize), lampSize * 0.8f, indicatorMaterial);
-            GameObject indicatorRearRight = CreateLamp(lampRoot.transform, "IndicatorRearRight", new Vector3(centreX + cornerX, lampY, rearZ + lampSize), lampSize * 0.8f, indicatorMaterial);
+            GameObject indicatorFrontLeft = CreateLamp(lampRoot.transform, "IndicatorFrontLeft", new Vector3(centreX - cornerX, lampY, frontZ), indicatorSize, indicatorMaterial);
+            GameObject indicatorRearLeft = CreateLamp(lampRoot.transform, "IndicatorRearLeft", new Vector3(centreX - cornerX, lampY, rearZ), indicatorSize, indicatorMaterial);
+            GameObject indicatorFrontRight = CreateLamp(lampRoot.transform, "IndicatorFrontRight", new Vector3(centreX + cornerX, lampY, frontZ), indicatorSize, indicatorMaterial);
+            GameObject indicatorRearRight = CreateLamp(lampRoot.transform, "IndicatorRearRight", new Vector3(centreX + cornerX, lampY, rearZ), indicatorSize, indicatorMaterial);
 
             // Two real spot lights only for the headlights. They are switched off unless the
             // player turns the headlights on, and they are the one genuinely expensive part
             // of this - drop them first if a low-end device struggles.
-            Light spotLeft = CreateHeadlightSpot(headlightLeft.transform, measurements);
-            Light spotRight = CreateHeadlightSpot(headlightRight.transform, measurements);
+            Light spotLeft = CreateHeadlightSpot(lampRoot.transform, new Vector3(centreX - sideX, lampY, frontZ), measurements);
+            Light spotRight = CreateHeadlightSpot(lampRoot.transform, new Vector3(centreX + sideX, lampY, frontZ), measurements);
 
             VehicleLights lights = car.GetComponent<VehicleLights>();
 
@@ -245,6 +260,7 @@ namespace CarParkingGame.EditorTools
         {
             AudioClip crash = PrepareClip(CrashClipPath);
             AudioClip braking = PrepareClip(BrakeClipPath);
+            AudioClip ticking = PrepareClip(IndicatorClipPath);
 
             if (crash == null)
             {
@@ -285,10 +301,41 @@ namespace CarParkingGame.EditorTools
             SetObject(brakeSerialized, "source", brakeSource);
             brakeSerialized.ApplyModifiedProperties();
 
+            WireIndicatorAudio(car, ticking);
+
             EditorUtility.SetDirty(impact);
             EditorUtility.SetDirty(brake);
 
             Debug.Log($"[VehicleDressingTool] '{car.name}': crash '{(crash != null ? crash.name : "none")}', brake '{(braking != null ? braking.name : "none")}'.", car);
+        }
+
+        // The indicator tick lives with VehicleLights, because it has to keep time with
+        // the lamps and stop when they do.
+        private static void WireIndicatorAudio(CarController car, AudioClip ticking)
+        {
+            var lights = car.GetComponent<VehicleLights>();
+
+            if (lights == null)
+            {
+                Debug.LogWarning($"[VehicleDressingTool] '{car.name}' has no VehicleLights, so the indicator cannot tick.", car);
+                return;
+            }
+
+            var audio = lights.GetComponent<VehicleIndicatorAudio>();
+
+            if (audio == null)
+            {
+                audio = lights.gameObject.AddComponent<VehicleIndicatorAudio>();
+            }
+
+            AudioSource source = MakeAudioSource(car, IndicatorSourceName, 0.55f);
+
+            var serialized = new SerializedObject(audio);
+            SetObject(serialized, "tick", ticking);
+            SetObject(serialized, "source", source);
+            serialized.ApplyModifiedProperties();
+
+            EditorUtility.SetDirty(audio);
         }
 
         // Short effects played often: decoded once at load rather than streamed or
@@ -305,7 +352,15 @@ namespace CarParkingGame.EditorTools
             if (AssetImporter.GetAtPath(path) is AudioImporter importer)
             {
                 AudioImporterSampleSettings settings = importer.defaultSampleSettings;
-                settings.loadType = AudioClipLoadType.DecompressOnLoad;
+
+                // A bang is decoded up front because it has to land the frame it is asked
+                // for. A long loop is left compressed: decoding nineteen seconds of
+                // ticking into memory costs about two megabytes to save a start-up that
+                // nobody is waiting on.
+                settings.loadType = clip.length > 3f
+                    ? AudioClipLoadType.CompressedInMemory
+                    : AudioClipLoadType.DecompressOnLoad;
+
                 settings.preloadAudioData = true;
 
                 importer.defaultSampleSettings = settings;
@@ -659,13 +714,16 @@ namespace CarParkingGame.EditorTools
             return true;
         }
 
-        private static GameObject CreateLamp(Transform parent, string name, Vector3 localPosition, float size, Material material)
+        private static GameObject CreateLamp(Transform parent, string name, Vector3 localPosition, Vector3 size, Material material)
         {
-            GameObject lamp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            GameObject lamp = GameObject.CreatePrimitive(PrimitiveType.Cube);
             lamp.name = name;
             lamp.transform.SetParent(parent, false);
             lamp.transform.localPosition = localPosition;
-            lamp.transform.localScale = Vector3.one * Mathf.Max(0.05f, size);
+            lamp.transform.localScale = new Vector3(
+                Mathf.Max(0.05f, size.x),
+                Mathf.Max(0.04f, size.y),
+                Mathf.Max(0.04f, size.z));
 
             // Primitives ship with a collider; leaving it on would give the car phantom
             // bumpers that collide with the world and register scoring penalties.
@@ -685,11 +743,16 @@ namespace CarParkingGame.EditorTools
             return lamp;
         }
 
-        private static Light CreateHeadlightSpot(Transform lamp, CarMeasurements measurements)
+        // Parented to the lamp root rather than to the lamp itself.
+        //
+        // A lamp is a flattened box now, which means a very non-uniform scale, and Unity
+        // skews a child transform under one of those. Hung off the lamp, the beam would be
+        // aimed somewhere other than where it was pointed.
+        private static Light CreateHeadlightSpot(Transform lampRoot, Vector3 localPosition, CarMeasurements measurements)
         {
             var lightObject = new GameObject("Spot");
-            lightObject.transform.SetParent(lamp, false);
-            lightObject.transform.localPosition = Vector3.zero;
+            lightObject.transform.SetParent(lampRoot, false);
+            lightObject.transform.localPosition = localPosition;
 
             // Dipped, like a real low beam. Aimed dead level the cone washed out over the
             // horizon and lit nothing the player could see.
