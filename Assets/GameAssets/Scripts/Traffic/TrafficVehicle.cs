@@ -30,6 +30,7 @@ namespace CarParkingGame.Traffic
         private float sensorTimer;
         private bool blockedAhead;
         private Rigidbody body;
+        private float rideHeight;
 
         private void Awake()
         {
@@ -40,6 +41,33 @@ namespace CarParkingGame.Traffic
             {
                 sensorOrigin = transform;
             }
+
+            rideHeight = MeasureRideHeight();
+        }
+
+        // How far the pivot sits above the bottom of the tyres.
+        //
+        // The car packs do not agree on where a prefab's pivot is - some have it on the
+        // floor, some in the middle of the body - so putting a car straight onto a waypoint
+        // buried half of them in the road. Measuring it means a waypoint can be placed on
+        // the road surface and every model stands on it, whatever the pack did.
+        private float MeasureRideHeight()
+        {
+            var renderers = GetComponentsInChildren<Renderer>(true);
+
+            if (renderers.Length == 0)
+            {
+                return 0f;
+            }
+
+            Bounds bounds = renderers[0].bounds;
+
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+
+            return Mathf.Max(0f, transform.position.y - bounds.min.y);
         }
 
         public bool HasPath => path != null && path.IsUsable;
@@ -64,7 +92,7 @@ namespace CarParkingGame.Traffic
             facing.y = 0f;
 
             transform.SetPositionAndRotation(
-                waypoint.position,
+                waypoint.position + Vector3.up * rideHeight,
                 facing.sqrMagnitude > 0.001f ? Quaternion.LookRotation(facing) : waypoint.rotation);
         }
 

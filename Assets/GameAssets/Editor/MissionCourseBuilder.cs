@@ -1089,6 +1089,17 @@ namespace CarParkingGame.EditorTools
                 Buildings(-blockX, blockNear, blockX, blockNear, 0f);
                 Buildings(-blockX, blockFar, blockX, blockFar, 180f);
 
+                // Four rows of buildings meeting at right angles leave a square hole at
+                // each corner, and the chase camera sits high enough to look straight
+                // through one at the empty ground outside. A building set across the
+                // corner, facing the crossing, closes it.
+                const float Corner = 5f;
+
+                CornerBuilding(-blockX - Corner, blockNear - Corner, 45f);
+                CornerBuilding(blockX + Corner, blockNear - Corner, 315f);
+                CornerBuilding(-blockX - Corner, blockFar + Corner, 135f);
+                CornerBuilding(blockX + Corner, blockFar + Corner, 225f);
+
                 RingTraffic(ringX, ringNear, ringFar);
             }
 
@@ -1115,9 +1126,13 @@ namespace CarParkingGame.EditorTools
             }
 
             // Shoulder to shoulder along one side, facing the road.
+            //
+            // The line passed in is the front of the row - the back edge of the pavement -
+            // so each building is pushed back by half its own depth and its face lands on
+            // that line however deep it happens to be.
             private void Buildings(float x1, float z1, float x2, float z2, float facing)
             {
-                List<CityChunkLibrary.Building> stock = Stock();
+                List<CityBlockLibrary.Block> stock = Stock();
 
                 if (stock.Count == 0)
                 {
@@ -1134,38 +1149,55 @@ namespace CarParkingGame.EditorTools
 
                 while (along < run)
                 {
-                    CityChunkLibrary.Building building = stock[surroundRandom.Next(stock.Count)];
+                    CityBlockLibrary.Block building = stock[surroundRandom.Next(stock.Count)];
 
-                    // Turned to face the road, so its front is what the player sees. Its
-                    // width along the row is then its own depth or breadth depending on the
-                    // turn, so the step is taken from the turned footprint.
-                    float width = Mathf.Abs(facing % 180f) < 1f ? building.size.x : building.size.z;
-                    width = Mathf.Max(6f, width);
+                    // Every building is set down face on to the road, so what it takes up
+                    // along the row is always its own width.
+                    float width = building.width;
 
-                    if (along + width > run + width * 0.5f)
+                    if (along + width > run)
                     {
                         break;
                     }
 
-                    Vector2 at = from + step * (along + width * 0.5f);
-
-                    var block = new GameObject("Building");
-                    block.transform.SetParent(root, false);
-                    block.transform.localPosition = new Vector3(at.x, level, at.y);
-                    block.transform.localRotation = Quaternion.Euler(0f, facing, 0f);
-
-                    block.AddComponent<MeshFilter>().sharedMesh = building.mesh;
-
-                    var renderer = block.AddComponent<MeshRenderer>();
-                    renderer.sharedMaterials = building.materials;
-
-                    // Backdrop: a skyline the player cannot reach is not worth shadowing,
-                    // and it has no collider because nothing can get to it anyway.
-                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    renderer.receiveShadows = false;
-
-                    along += width + 0.6f;
+                    Place(building, from + step * (along + width * 0.5f), facing);
+                    along += width + 0.5f;
                 }
+            }
+
+            private void CornerBuilding(float x, float z, float facing)
+            {
+                List<CityBlockLibrary.Block> stock = Stock();
+
+                if (stock.Count > 0)
+                {
+                    Place(stock[surroundRandom.Next(stock.Count)], new Vector2(x, z), facing);
+                }
+            }
+
+            // The point given is where the front of the building goes, so a row lines up on
+            // its faces whatever depths the buildings in it happen to have.
+            private void Place(CityBlockLibrary.Block building, Vector2 front, float facing)
+            {
+                float radians = facing * Mathf.Deg2Rad;
+                var back = new Vector2(-Mathf.Sin(radians), -Mathf.Cos(radians));
+
+                Vector2 at = front + back * (building.depth * 0.5f);
+
+                var block = new GameObject("Building");
+                block.transform.SetParent(root, false);
+                block.transform.localPosition = new Vector3(at.x, level, at.y);
+                block.transform.localRotation = Quaternion.Euler(0f, facing, 0f);
+
+                block.AddComponent<MeshFilter>().sharedMesh = building.mesh;
+
+                var renderer = block.AddComponent<MeshRenderer>();
+                renderer.sharedMaterials = building.materials;
+
+                // Backdrop: a skyline the player cannot reach is not worth shadowing, and
+                // it has no collider because nothing can get to it anyway.
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
             }
 
             // Cars going round the ring, with a light on each corner.
@@ -1201,7 +1233,9 @@ namespace CarParkingGame.EditorTools
 
                         var point = new GameObject($"Waypoint {points.Count:00}");
                         point.transform.SetParent(host.transform, false);
-                        point.transform.localPosition = new Vector3(at.x, level, at.y);
+                        // Just clear of the road slab, which stands six centimetres proud of
+                        // the floor. A car sets itself down on this point by its own wheels.
+                        point.transform.localPosition = new Vector3(at.x, level + 0.07f, at.y);
 
                         var data = point.AddComponent<CarParkingGame.Traffic.TrafficWaypoint>();
                         points.Add(point.transform);
@@ -1317,18 +1351,21 @@ namespace CarParkingGame.EditorTools
                 paths.arraySize = 1;
                 paths.GetArrayElementAtIndex(0).objectReferenceValue = path;
 
-                // A short ring holds few cars before they are nose to tail.
-                serialized.FindProperty("maximumVehicles").intValue = 6;
+                // The ceiling on the pool. How many of those are switched on comes from the
+                // player's graphics setting - four, eight or twelve - so a ceiling under
+                // twelve quietly caps the high setting as well, which is what left the ring
+                // looking empty.
+                serialized.FindProperty("maximumVehicles").intValue = 12;
                 serialized.FindProperty("poolParent").objectReferenceValue = pool.transform;
                 serialized.ApplyModifiedProperties();
             }
 
-            private static List<CityChunkLibrary.Building> cachedStock;
+            private static List<CityBlockLibrary.Block> cachedStock;
             private readonly System.Random surroundRandom = new System.Random(20261006);
 
-            private static List<CityChunkLibrary.Building> Stock()
+            private static List<CityBlockLibrary.Block> Stock()
             {
-                return cachedStock ??= CityChunkLibrary.Load();
+                return cachedStock ??= CityBlockLibrary.Load();
             }
 
             public void Arrow(float x, float z, float yaw)
