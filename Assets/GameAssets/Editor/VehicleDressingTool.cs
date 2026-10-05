@@ -215,11 +215,85 @@ namespace CarParkingGame.EditorTools
             SetObject(hornSerialized, "hornClip", horn);
             hornSerialized.ApplyModifiedProperties();
 
+            WireVehicleVfx(car, body, haveBody);
             WirePaintTarget(car, lampRoot.transform);
             MeasureViewPoints(car);
             FitBodyCollider(car);
 
             Debug.Log($"[VehicleDressingTool] '{car.name}': {headlightSurfaces.Length} headlight and {brakeSurfaces.Length} tail lens(es) on the model, {leftMarkers.Count} left and {rightMarkers.Count} right indicator marker(s); horn wired.", car);
+        }
+
+        // Smoke off the tyres, marks on the road, smoke from the pipe, sparks on impact.
+        //
+        // Smoke and marks are built from ParticleSystem and TrailRenderer rather than from
+        // the effects pack, because they have to be driven continuously from wheel slip
+        // rather than fired once; the spark is a one-shot and comes from the pack, which
+        // keeps it in the same cartoon style as everything else on screen.
+        private static void WireVehicleVfx(CarController car, Bounds body, bool haveBody)
+        {
+            // Built on demand, so dressing a car never depends on having remembered to run
+            // the effects generator first.
+            if (AssetDatabase.LoadAssetAtPath<Material>(VfxLibraryGenerator.SmokeMaterialPath) == null)
+            {
+                VfxLibraryGenerator.Generate();
+            }
+
+            var smoke = AssetDatabase.LoadAssetAtPath<Material>(VfxLibraryGenerator.SmokeMaterialPath);
+
+            var tyres = car.GetComponent<VehicleTyreEffects>();
+
+            if (tyres == null)
+            {
+                tyres = car.gameObject.AddComponent<VehicleTyreEffects>();
+            }
+
+            var tyreSerialized = new SerializedObject(tyres);
+            SetObject(tyreSerialized, "smokeMaterial", smoke);
+            SetObject(tyreSerialized, "markMaterial", AssetDatabase.LoadAssetAtPath<Material>(VfxLibraryGenerator.SkidMaterialPath));
+            tyreSerialized.ApplyModifiedProperties();
+
+            var exhaust = car.GetComponent<VehicleExhaustSmoke>();
+
+            if (exhaust == null)
+            {
+                exhaust = car.gameObject.AddComponent<VehicleExhaustSmoke>();
+            }
+
+            // Off to one side at the back, low down - where a pipe is. Measured from the
+            // body rather than guessed, the way the lamps and the seat are.
+            if (haveBody)
+            {
+                exhaust.EditorSetPipe(new Vector3(
+                    body.center.x + body.extents.x * 0.55f,
+                    body.min.y + body.size.y * 0.1f,
+                    body.min.z - 0.05f));
+            }
+
+            var exhaustSerialized = new SerializedObject(exhaust);
+            SetObject(exhaustSerialized, "smokeMaterial", smoke);
+            exhaustSerialized.ApplyModifiedProperties();
+
+            var impact = car.GetComponent<VehicleImpactVfx>();
+
+            if (impact == null)
+            {
+                impact = car.gameObject.AddComponent<VehicleImpactVfx>();
+            }
+
+            var spark = AssetDatabase.LoadAssetAtPath<GameObject>(VfxLibraryGenerator.SparkPrefabPath);
+
+            if (spark == null)
+            {
+                Debug.LogWarning($"[VehicleDressingTool] No spark effect at '{VfxLibraryGenerator.SparkPrefabPath}'.");
+            }
+
+            var impactSerialized = new SerializedObject(impact);
+            SetObject(impactSerialized, "sparkPrefab", spark);
+            impactSerialized.ApplyModifiedProperties();
+
+            EditorUtility.SetDirty(tyres);
+            EditorUtility.SetDirty(exhaust);
+            EditorUtility.SetDirty(impact);
         }
 
         // The material slots the garage will paint.

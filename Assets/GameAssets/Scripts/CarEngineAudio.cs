@@ -98,16 +98,18 @@ public class CarEngineAudio : MonoBehaviour
         Fade(offThrottleSource, engineVolume * speed01 * (1f - throttle), step);
     }
 
+    // Scaled here rather than at each call site, so there is one place the engine reads
+    // the player's effects slider and no fade can be written that forgets to.
     private static void Fade(AudioSource source, float target, float step)
     {
-        source.volume = Mathf.MoveTowards(source.volume, target, step);
+        source.volume = Mathf.MoveTowards(source.volume, target * CarParkingGame.Settings.GameAudio.Sfx, step);
     }
 
     private void StartEngine()
     {
         if (startSource.clip != null)
         {
-            startSource.volume = 1f;
+            startSource.volume = CarParkingGame.Settings.GameAudio.Sfx;
             startSource.Play();
         }
 
@@ -115,7 +117,7 @@ public class CarEngineAudio : MonoBehaviour
         PlayLoop(onThrottleSource);
         PlayLoop(offThrottleSource);
 
-        idleSource.volume = idleVolume;
+        idleSource.volume = idleVolume * CarParkingGame.Settings.GameAudio.Sfx;
     }
 
     private static void PlayLoop(AudioSource source)

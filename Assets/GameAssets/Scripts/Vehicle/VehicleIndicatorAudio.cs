@@ -1,3 +1,4 @@
+using CarParkingGame.Settings;
 using UnityEngine;
 
 namespace CarParkingGame.Vehicle
@@ -18,6 +19,9 @@ namespace CarParkingGame.Vehicle
     {
         [SerializeField] private AudioClip tick;
         [SerializeField] private AudioSource source;
+
+        [Tooltip("How loud the tick is with the effects slider at full.")]
+        [SerializeField, Range(0f, 1f)] private float tickVolume = 0.55f;
 
         private VehicleLights lights;
 
@@ -43,6 +47,8 @@ namespace CarParkingGame.Vehicle
                 Silence();
                 return;
             }
+
+            source.volume = tickVolume * GameAudio.Sfx;
 
             if (source.isPlaying)
             {

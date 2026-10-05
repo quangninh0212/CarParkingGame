@@ -1,3 +1,4 @@
+using CarParkingGame.Settings;
 using UnityEngine;
 
 namespace CarParkingGame.Vehicle
@@ -79,7 +80,7 @@ namespace CarParkingGame.Vehicle
             float weight = Mathf.InverseLerp(quietBelow, loudAt, impulse);
 
             source.pitch = Mathf.Lerp(1.18f, 0.82f, weight) + Random.Range(-0.04f, 0.04f);
-            source.PlayOneShot(impact, Mathf.Lerp(0.25f, 1f, weight));
+            source.PlayOneShot(impact, Mathf.Lerp(0.25f, 1f, weight) * GameAudio.Sfx);
         }
     }
 }

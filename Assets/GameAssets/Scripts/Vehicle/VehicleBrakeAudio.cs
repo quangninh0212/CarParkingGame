@@ -1,3 +1,4 @@
+using CarParkingGame.Settings;
 using UnityEngine;
 
 namespace CarParkingGame.Vehicle
@@ -63,7 +64,7 @@ namespace CarParkingGame.Vehicle
                 level = Mathf.Lerp(0.35f, 1f, Mathf.InverseLerp(needsKmh, loudKmh, speed));
 
                 source.clip = brakeClip;
-                source.volume = level;
+                source.volume = level * GameAudio.Sfx;
                 source.Play();
                 return;
             }
@@ -89,7 +90,7 @@ namespace CarParkingGame.Vehicle
                 return;
             }
 
-            source.volume = level;
+            source.volume = level * GameAudio.Sfx;
         }
     }
 }

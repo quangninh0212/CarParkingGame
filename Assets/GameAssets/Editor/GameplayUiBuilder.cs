@@ -124,6 +124,8 @@ namespace CarParkingGame.EditorTools
             SetPrivate(pauseView, "menuRoot", menuRoot);
 
             BuildScreenFade(canvas, canvasObject);
+            BuildMusic(session);
+            BuildCelebration(session);
 
             WireSessionObjects(session, hud, pause);
             EnableGarageManager();
@@ -989,6 +991,84 @@ namespace CarParkingGame.EditorTools
 
             back = BackButton(screen.transform);
             return screen;
+        }
+
+        // Fireworks over a bay as it is filled, and a bigger set when the level is won.
+        private static void BuildCelebration(GameSession session)
+        {
+            const string HostName = "Celebration";
+
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(VfxLibraryGenerator.FinishPrefabPath) == null)
+            {
+                VfxLibraryGenerator.Generate();
+            }
+
+            Transform existing = session.transform.Find(HostName);
+
+            if (existing != null)
+            {
+                Object.DestroyImmediate(existing.gameObject);
+            }
+
+            var host = new GameObject(HostName);
+            host.transform.SetParent(session.transform, false);
+
+            var celebration = host.AddComponent<MissionCelebration>();
+
+            SetPrivate(celebration, "missions", Object.FindFirstObjectByType<MissionManager>(FindObjectsInactive.Include));
+            SetPrivate(celebration, "bayEffect", AssetDatabase.LoadAssetAtPath<GameObject>(VfxLibraryGenerator.BayPrefabPath));
+            SetPrivate(celebration, "finishEffect", AssetDatabase.LoadAssetAtPath<GameObject>(VfxLibraryGenerator.FinishPrefabPath));
+
+            Debug.Log("[GameplayUiBuilder] Celebration effects wired to the mission runner.");
+        }
+
+        // The background music, on the session object because it belongs to the game
+        // rather than to any one screen.
+        private static void BuildMusic(GameSession session)
+        {
+            const string ClipPath = "Assets/GameAssets/Audio/prettyjohn1-chill-chill-music-520383.mp3";
+            const string HostName = "Music";
+
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(ClipPath);
+
+            if (clip == null)
+            {
+                Debug.LogWarning($"[GameplayUiBuilder] No music at '{ClipPath}'; the game will be silent between engine notes.");
+                return;
+            }
+
+            Transform existing = session.transform.Find(HostName);
+
+            if (existing != null)
+            {
+                Object.DestroyImmediate(existing.gameObject);
+            }
+
+            var host = new GameObject(HostName);
+            host.transform.SetParent(session.transform, false);
+
+            AudioSource source = host.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.loop = true;
+            source.spatialBlend = 0f;
+
+            var player = host.AddComponent<MusicPlayer>();
+            SetPrivate(player, "track", clip);
+
+            // Streamed rather than decoded into memory. It is minutes long and it is the
+            // one clip in the game that is allowed to start a fraction of a second late.
+            if (AssetImporter.GetAtPath(ClipPath) is AudioImporter importer)
+            {
+                AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+                settings.loadType = AudioClipLoadType.Streaming;
+                settings.preloadAudioData = false;
+
+                importer.defaultSampleSettings = settings;
+                importer.forceToMono = false;
+                importer.SaveAndReimport();
+            }
+
+            Debug.Log($"[GameplayUiBuilder] Music '{clip.name}' ({clip.length:0}s) wired to the music slider.");
         }
 
         // The black that a challenge run swaps levels behind. Built last so it is the last

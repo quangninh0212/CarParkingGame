@@ -52,6 +52,11 @@ namespace CarParkingGame.Missions
 
         public bool IsRunning => running;
         public MissionDefinition ActiveMission => activeMission != null ? activeMission.Definition : null;
+
+        // The scene half of the running mission, for anything that needs a bay other than
+        // the one currently being asked for - the celebration goes off over the bay that
+        // was just filled, not over the next one.
+        public MissionAuthoring ActiveAuthoring => activeMission;
         public ParkingZone ActiveZone => activeMission != null ? activeMission.GetBay(bayIndex) : null;
         public int BaysFilled => bayIndex;
         public int BayCount => activeMission != null ? activeMission.BayCount : 0;
