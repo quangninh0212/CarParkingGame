@@ -3,6 +3,7 @@ using CarParkingGame.Core;
 using CarParkingGame.Garage;
 using CarParkingGame.Missions;
 using CarParkingGame.Progression;
+using CarParkingGame.Settings;
 using CarParkingGame.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -85,8 +86,58 @@ namespace CarParkingGame.EditorTools
             CheckGarageIsLive(problems);
             CheckNoViewHidesItself(problems);
             CheckPracticeGate(problems);
+            CheckCameraSensitivityIsLive(problems);
 
             return problems;
+        }
+
+        // The camera speed slider has to reach the camera.
+        //
+        // A slider that is assigned, drawn and saved but whose value never arrives at the
+        // thing it names is the failure this game has already shipped once: both volume
+        // sliders moved and changed nothing. So this does not check the wiring, it checks
+        // the effect - it sets a value through the settings and then reads the camera's own
+        // scale back. The player's saved value is put back afterwards.
+        private static void CheckCameraSensitivityIsLive(List<string> problems)
+        {
+            var view = Object.FindFirstObjectByType<SettingsView>(FindObjectsInactive.Include);
+            var manager = Object.FindFirstObjectByType<SettingsManager>(FindObjectsInactive.Include);
+
+            if (view == null || manager == null)
+            {
+                problems.Add("no SettingsView or SettingsManager to check the camera speed slider against");
+                return;
+            }
+
+            var serialized = new SerializedObject(view);
+            var slider = serialized.FindProperty("cameraSensitivitySlider").objectReferenceValue as Slider;
+
+            if (slider == null)
+            {
+                problems.Add("SettingsView.cameraSensitivitySlider is not assigned");
+                return;
+            }
+
+            // A slider that offers values the setting then clamps away is a slider whose
+            // right-hand end does nothing.
+            if (!Mathf.Approximately(slider.minValue, SettingsManager.MinCameraSensitivity)
+                || !Mathf.Approximately(slider.maxValue, SettingsManager.MaxCameraSensitivity))
+            {
+                problems.Add($"the camera speed slider runs {slider.minValue} to {slider.maxValue}, "
+                    + $"but the setting clamps to {SettingsManager.MinCameraSensitivity}-{SettingsManager.MaxCameraSensitivity}");
+            }
+
+            float saved = SaveManager.Data.settings.cameraSensitivity;
+            float probe = Mathf.Approximately(saved, 2f) ? 1f : 2f;
+
+            manager.SetCameraSensitivity(probe);
+
+            if (!Mathf.Approximately(CarCameraController.SensitivityScale, probe))
+            {
+                problems.Add("setting the camera speed does not reach the camera; the slider would do nothing");
+            }
+
+            manager.SetCameraSensitivity(saved);
         }
 
         // Walks the component's serialized object instead of naming fields one by one, so

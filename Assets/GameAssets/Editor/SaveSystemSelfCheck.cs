@@ -199,6 +199,7 @@ namespace CarParkingGame.EditorTools
             data.settings.graphicsQuality = 77;
             data.settings.targetFrameRate = 144;
             data.settings.steeringSensitivity = 0f;
+            data.settings.cameraSensitivity = 99f;
             data.missions.Add(new MissionProgressData(1));
             data.missions.Add(new MissionProgressData(5) { completed = true, unlocked = false, bestStars = 99, bestScore = -10 });
 
@@ -209,6 +210,7 @@ namespace CarParkingGame.EditorTools
             Check(failures, data.settings.graphicsQuality == SaveData.MaxGraphicsQuality, "graphics quality above range should clamp to the highest level");
             Check(failures, data.settings.targetFrameRate == 60, "an unsupported frame rate should snap to 60");
             Check(failures, Mathf.Approximately(data.settings.steeringSensitivity, 0.25f), "zero steering sensitivity should clamp to the minimum");
+            Check(failures, Mathf.Approximately(data.settings.cameraSensitivity, 3f), "camera sensitivity above range should clamp to the maximum");
             Check(failures, CountMissionEntries(data, 1) == 1, "duplicate mission entries should be removed");
 
             MissionProgressData mission5 = data.FindMission(5);

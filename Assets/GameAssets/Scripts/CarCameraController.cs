@@ -9,6 +9,11 @@ public class CarCameraController : MonoBehaviour
     public float followSmoothSpeed = 0f;
 
     public float mouseSensitivity = 500f;
+
+    // Scaled by the player's Settings slider. Static for the same reason the steering
+    // sensitivity is: the settings are applied at startup, before anything has gone
+    // looking for the camera, and there is only ever one of these in the scene.
+    public static float SensitivityScale = 1f;
     public float rotationSmoothSpeed = 0f;
 
     public float minVerticalAngle = -6f;
@@ -72,14 +77,16 @@ public class CarCameraController : MonoBehaviour
             return;
         }
 
+        float sensitivity = mouseSensitivity * SensitivityScale;
+
         float mouseX =
             Input.GetAxis("Mouse X") *
-            mouseSensitivity *
+            sensitivity *
             Time.deltaTime;
 
         float mouseY =
             -Input.GetAxis("Mouse Y") *
-            mouseSensitivity *
+            sensitivity *
             Time.deltaTime;
 
         mouseDelta += new Vector2(mouseX, mouseY);

@@ -12,6 +12,7 @@ namespace CarParkingGame.UI
         [SerializeField] private Slider musicSlider;
         [SerializeField] private Slider sfxSlider;
         [SerializeField] private Slider sensitivitySlider;
+        [SerializeField] private Slider cameraSensitivitySlider;
         [SerializeField] private Button lowQualityButton;
         [SerializeField] private Button mediumQualityButton;
         [SerializeField] private Button highQualityButton;
@@ -31,6 +32,7 @@ namespace CarParkingGame.UI
             musicSlider?.onValueChanged.AddListener(value => Settings?.SetMusicVolume(value));
             sfxSlider?.onValueChanged.AddListener(value => Settings?.SetSfxVolume(value));
             sensitivitySlider?.onValueChanged.AddListener(value => Settings?.SetSteeringSensitivity(value));
+            cameraSensitivitySlider?.onValueChanged.AddListener(value => Settings?.SetCameraSensitivity(value));
 
             lowQualityButton?.onClick.AddListener(() => SetTier(GraphicsTier.Low));
             mediumQualityButton?.onClick.AddListener(() => SetTier(GraphicsTier.Medium));
@@ -57,6 +59,7 @@ namespace CarParkingGame.UI
             SetSliderWithoutNotify(musicSlider, saved.musicVolume);
             SetSliderWithoutNotify(sfxSlider, saved.sfxVolume);
             SetSliderWithoutNotify(sensitivitySlider, saved.steeringSensitivity);
+            SetSliderWithoutNotify(cameraSensitivitySlider, saved.cameraSensitivity);
 
             if (qualityLabel != null)
             {

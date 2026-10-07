@@ -617,6 +617,7 @@ namespace CarParkingGame.EditorTools
             BuildStoryScreen(root.transform, story);
             GameObject modeScreen = BuildModeScreen(root.transform, out Button practiceMode, out Button challengeMode, out Button freeMode, out Button modeBack);
             GameObject practiceScreen = BuildPracticeScreen(root.transform, out Button practiceBack);
+            GameObject freeDriveScreen = BuildFreeDriveScreen(root.transform, out Button circuitMap, out Button cityMap, out Button freeDriveBack);
             GameObject garageScreen = BuildGarageScreen(root.transform, out Button garageBack);
             GameObject settingsScreen = BuildSettingsScreen(root.transform, out Button settingsBack);
 
@@ -625,6 +626,7 @@ namespace CarParkingGame.EditorTools
             SetPrivate(menu, "homeScreen", home);
             SetPrivate(menu, "modeScreen", modeScreen);
             SetPrivate(menu, "practiceScreen", practiceScreen);
+            SetPrivate(menu, "freeDriveScreen", freeDriveScreen);
             SetPrivate(menu, "garageScreen", garageScreen);
             SetPrivate(menu, "settingsScreen", settingsScreen);
             SetPrivate(menu, "showroom", session.GetComponent<ShowroomCameraRig>());
@@ -637,12 +639,15 @@ namespace CarParkingGame.EditorTools
             SetPrivate(menu, "practiceModeButton", practiceMode);
             SetPrivate(menu, "challengeModeButton", challengeMode);
             SetPrivate(menu, "freeRoamModeButton", freeMode);
-            SetPrivateArray(menu, "backButtons", new Object[] { modeBack, practiceBack, garageBack, settingsBack });
+            SetPrivate(menu, "circuitMapButton", circuitMap);
+            SetPrivate(menu, "cityMapButton", cityMap);
+            SetPrivateArray(menu, "backButtons", new Object[] { modeBack, practiceBack, freeDriveBack, garageBack, settingsBack });
 
             // MenuController would sort this out on its first frame anyway; doing it here
             // keeps the saved scene showing one screen instead of five stacked up.
             modeScreen.SetActive(false);
             practiceScreen.SetActive(false);
+            freeDriveScreen.SetActive(false);
             garageScreen.SetActive(false);
             settingsScreen.SetActive(false);
 
@@ -754,6 +759,42 @@ namespace CarParkingGame.EditorTools
                 "No missions, no timer. Just the map.",
                 520f,
                 new Color(0.3f, 0.75f, 0.45f));
+
+            back = BackButton(screen.transform);
+            return screen;
+        }
+
+        // Free drive has two maps now, so the mode card opens a chooser instead of starting
+        // straight away. Same cards as the mode screen, because they are the same kind of
+        // choice and a second visual language for it would only be a second thing to learn.
+        private static GameObject BuildFreeDriveScreen(Transform parent, out Button circuit, out Button city, out Button back)
+        {
+            GameObject screen = CreateChild(parent, "FreeDriveScreen");
+            Stretch(screen);
+
+            Image dim = CreateImage(screen.transform, "Dim", Dim);
+            Stretch(dim.gameObject);
+
+            Text title = CreateLabel(screen.transform, "Title", "CHOOSE A MAP", 46, TextAnchor.MiddleCenter);
+            SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(800f, 60f), new Vector2(0.5f, 0.5f));
+
+            circuit = ModeCard(
+                screen.transform,
+                "CircuitMapCard",
+                "cone",
+                "RACE TRACK",
+                "The circuit the car parks are built on. Wide, open and quick.",
+                -260f,
+                new Color(0.3f, 0.75f, 0.45f));
+
+            city = ModeCard(
+                screen.transform,
+                "CityMapCard",
+                "compass",
+                "CITY",
+                "Three hundred metres of streets, junctions and buildings to drive through.",
+                260f,
+                AccentColor);
 
             back = BackButton(screen.transform);
             return screen;
@@ -944,7 +985,7 @@ namespace CarParkingGame.EditorTools
             Image dim = CreateImage(screen.transform, "Dim", Dim);
             Stretch(dim.gameObject);
 
-            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(1060f, 820f), PanelColor);
+            GameObject panel = CreatePanel(screen.transform, "Panel", new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(1060f, 900f), PanelColor);
 
             Text title = CreateLabel(panel.transform, "Title", "SETTINGS", 44, TextAnchor.MiddleCenter);
             SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(600f, 56f), new Vector2(0.5f, 0.5f));
@@ -954,19 +995,21 @@ namespace CarParkingGame.EditorTools
             Slider music = CreateSlider(panel.transform, "MusicSlider", "Music", -150f, 0f, 1f);
             Slider sfx = CreateSlider(panel.transform, "SfxSlider", "SFX", -230f, 0f, 1f);
             Slider sensitivity = CreateSlider(panel.transform, "SensitivitySlider", "Steering", -310f, 0.25f, 3f);
+            Slider cameraSensitivity = CreateSlider(panel.transform, "CameraSensitivitySlider", "Camera speed", -390f,
+                SettingsManager.MinCameraSensitivity, SettingsManager.MaxCameraSensitivity);
 
             // Caption on its own row, choices on the row beneath it. Putting both on one
             // row is what had "RESET PROGRESS" sitting across "CLOSE" before.
-            Text qualityValue = CreateRowCaption(panel.transform, "Graphics", -390f);
-            Button low = SmallButton(panel.transform, "LowButton", "LOW", new Vector2(150f, -456f));
-            Button medium = SmallButton(panel.transform, "MediumButton", "MEDIUM", new Vector2(340f, -456f));
-            Button high = SmallButton(panel.transform, "HighButton", "HIGH", new Vector2(530f, -456f));
+            Text qualityValue = CreateRowCaption(panel.transform, "Graphics", -470f);
+            Button low = SmallButton(panel.transform, "LowButton", "LOW", new Vector2(150f, -536f));
+            Button medium = SmallButton(panel.transform, "MediumButton", "MEDIUM", new Vector2(340f, -536f));
+            Button high = SmallButton(panel.transform, "HighButton", "HIGH", new Vector2(530f, -536f));
 
-            Text fpsValue = CreateRowCaption(panel.transform, "Frame rate", -540f);
-            Button fps30 = SmallButton(panel.transform, "Fps30Button", "30 FPS", new Vector2(150f, -606f));
-            Button fps60 = SmallButton(panel.transform, "Fps60Button", "60 FPS", new Vector2(340f, -606f));
+            Text fpsValue = CreateRowCaption(panel.transform, "Frame rate", -620f);
+            Button fps30 = SmallButton(panel.transform, "Fps30Button", "30 FPS", new Vector2(150f, -686f));
+            Button fps60 = SmallButton(panel.transform, "Fps60Button", "60 FPS", new Vector2(340f, -686f));
 
-            Button reset = WideButton(panel.transform, "ResetButton", "RESET PROGRESS", new Vector2(0.5f, 1f), new Vector2(0f, -726f), new Vector2(400f, 76f), WarnColor);
+            Button reset = WideButton(panel.transform, "ResetButton", "RESET PROGRESS", new Vector2(0.5f, 1f), new Vector2(0f, -806f), new Vector2(400f, 76f), WarnColor);
 
             GameObject confirm = CreatePanel(panel.transform, "ResetConfirm", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 300f), new Color(0.05f, 0.06f, 0.09f, 0.99f));
             Text confirmText = CreateLabel(confirm.transform, "ConfirmText", "Erase all progress?", 32, TextAnchor.MiddleCenter);
@@ -980,6 +1023,7 @@ namespace CarParkingGame.EditorTools
             SetPrivate(view, "musicSlider", music);
             SetPrivate(view, "sfxSlider", sfx);
             SetPrivate(view, "sensitivitySlider", sensitivity);
+            SetPrivate(view, "cameraSensitivitySlider", cameraSensitivity);
             SetPrivate(view, "lowQualityButton", low);
             SetPrivate(view, "mediumQualityButton", medium);
             SetPrivate(view, "highQualityButton", high);

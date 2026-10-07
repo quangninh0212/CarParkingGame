@@ -13,6 +13,11 @@ namespace CarParkingGame.Settings
     {
         public static SettingsManager Instance { get; private set; }
 
+        // The ends of the camera speed slider. Shared with the screen that draws it so the
+        // slider cannot offer a value the setting would then clamp away.
+        public const float MinCameraSensitivity = 0.4f;
+        public const float MaxCameraSensitivity = 3f;
+
         [SerializeField] private QualityProfile qualityProfile;
 
         private QualityProfile profile;
@@ -55,6 +60,7 @@ namespace CarParkingGame.Settings
             ApplyGraphics(profile.For(Tier));
             ApplyFrameRate(settings.targetFrameRate);
             VehicleInput.SteeringSensitivity = settings.steeringSensitivity;
+            CarCameraController.SensitivityScale = settings.cameraSensitivity;
 
             SettingsApplied?.Invoke();
         }
@@ -83,6 +89,16 @@ namespace CarParkingGame.Settings
         public void SetSfxVolume(float volume)
         {
             SaveManager.Data.settings.sfxVolume = Mathf.Clamp01(volume);
+            SaveManager.Save();
+            SettingsApplied?.Invoke();
+        }
+
+        public void SetCameraSensitivity(float sensitivity)
+        {
+            float clamped = Mathf.Clamp(sensitivity, MinCameraSensitivity, MaxCameraSensitivity);
+
+            SaveManager.Data.settings.cameraSensitivity = clamped;
+            CarCameraController.SensitivityScale = clamped;
             SaveManager.Save();
             SettingsApplied?.Invoke();
         }

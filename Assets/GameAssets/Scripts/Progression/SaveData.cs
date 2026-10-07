@@ -50,6 +50,11 @@ namespace CarParkingGame.Progression
         public float musicVolume = 0.8f;
         public float sfxVolume = 1f;
         public float steeringSensitivity = 1f;
+
+        // How fast dragging swings the chase camera round the car, as a multiple of the
+        // camera's own speed. Above one because the camera's own speed is slow enough that
+        // looking behind you takes several drags.
+        public float cameraSensitivity = 1.5f;
     }
 
     [Serializable]
@@ -208,6 +213,7 @@ namespace CarParkingGame.Progression
             settings.musicVolume = Mathf.Clamp01(settings.musicVolume);
             settings.sfxVolume = Mathf.Clamp01(settings.sfxVolume);
             settings.steeringSensitivity = Mathf.Clamp(settings.steeringSensitivity, 0.25f, 3f);
+            settings.cameraSensitivity = Mathf.Clamp(settings.cameraSensitivity, 0.4f, 3f);
 
             coins = Mathf.Max(0, coins);
             selectedCarIndex = Mathf.Max(0, selectedCarIndex);

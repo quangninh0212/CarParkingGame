@@ -77,3 +77,8 @@ Desktop.ini
 # Unity temp/debug folders
 .utmp/
 CarParkingGame_BurstDebugInformation_DoNotShip/
+
+# The city model for the free-drive map: 166MB, over GitHub's 100MB file limit.
+# It lives in the project but never in the repo.
+/Assets/CityModel/
+/Assets/CityModel.meta

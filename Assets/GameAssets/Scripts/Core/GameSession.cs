@@ -45,6 +45,12 @@ namespace CarParkingGame.Core
         [Tooltip("Optional. Where free roam puts the car; the first mission's start point is used when empty.")]
         [SerializeField] private Transform freeRoamSpawn;
 
+        [Tooltip("The city, built by Tools/Car Parking/Build City Free Drive Map. Switched on only while the city map is being driven.")]
+        [SerializeField] private GameObject cityMapRoot;
+
+        [Tooltip("Where the city map puts the car.")]
+        [SerializeField] private Transform cityRoamSpawn;
+
         private GameplayMode mode = GameplayMode.None;
         private bool paused;
         private int challengeStage;
@@ -114,6 +120,7 @@ namespace CarParkingGame.Core
             challengeStage = 0;
 
             Time.timeScale = 0f;
+            SetActive(cityMapRoot, false);
             SetActive(menuCamera, true);
             SetActive(gameplayCamera, false);
             SetActive(mobileControls, false);
@@ -175,15 +182,38 @@ namespace CarParkingGame.Core
             StartChallengeStage(resume);
         }
 
+        // Which of the two free-drive maps was last chosen, so restarting from the pause
+        // menu puts the player back on the map they were driving rather than the other one.
+        // Backed by a named field rather than an auto-property so the city check can
+        // set it and then run the real placement, instead of testing a copy of it.
+        [SerializeField, HideInInspector] private bool inCity;
+
+        public bool InCity => inCity;
+
         public void StartFreeRoam()
         {
+            StartFreeRoam(InCity);
+        }
+
+        public void StartFreeRoam(bool city)
+        {
             MissionManager runner = Missions;
+
+            inCity = city && cityMapRoot != null;
 
             EnterPlay(GameplayMode.FreeRoam);
 
             if (runner != null)
             {
                 runner.SetAllEnvironmentsActive(false);
+            }
+
+            // One map at a time. The city is over a million triangles with a collider on
+            // all of it, so leaving it switched on while the player drives the circuit
+            // would cost the whole of it for nothing.
+            if (cityMapRoot != null)
+            {
+                cityMapRoot.SetActive(InCity);
             }
 
             PlaceCarAtFreeRoamSpawn();
@@ -297,6 +327,11 @@ namespace CarParkingGame.Core
             mode = next;
             paused = false;
 
+            // Off by default on every way into play. StartFreeRoam switches it back on
+            // after this when the city is the map that was picked, so no other entry point
+            // has to remember the city exists.
+            SetActive(cityMapRoot, false);
+
             Time.timeScale = 1f;
             SetActive(menuCamera, false);
             SetActive(gameplayCamera, true);
@@ -380,7 +415,7 @@ namespace CarParkingGame.Core
                 return;
             }
 
-            Transform spawn = freeRoamSpawn;
+            Transform spawn = InCity && cityRoamSpawn != null ? cityRoamSpawn : freeRoamSpawn;
 
             if (spawn == null)
             {
@@ -402,7 +437,69 @@ namespace CarParkingGame.Core
                 body.angularVelocity = Vector3.zero;
             }
 
-            car.transform.SetPositionAndRotation(spawn.position, spawn.rotation);
+            // The circuit spawn is left exactly as it was. Only the city needs the car
+            // stood on the ground, and the circuit has been played enough that changing
+            // where it starts the car would be a change nobody asked for.
+            Vector3 position = InCity ? StandOnGround(car.transform, spawn.position) : spawn.position;
+
+            car.transform.SetPositionAndRotation(position, spawn.rotation);
+        }
+
+        // Where to put a car's pivot so it stands on the road under a spawn marker.
+        //
+        // The city spawn sits a few centimetres over the tarmac, which is right for a car
+        // whose origin is on its wheels - the sedan and the hatchback - and wrong for one
+        // whose origin is in the middle of the body. The classic's is 0.97m above its own
+        // tyres, so putting its pivot at the marker buried its wheels most of a metre under
+        // the road, and the physics engine pushed that overlap apart the only way it can:
+        // by throwing the car into the air, to land on its roof.
+        //
+        // The car park levels do not hit this because the course builder lifts every start
+        // point a metre off the floor, which happens to cover the deepest pivot in the car
+        // packs. Looking for the ground instead means no height has to happen to be right.
+        public static Vector3 StandOnGround(Transform vehicle, Vector3 spawn)
+        {
+            if (vehicle == null)
+            {
+                return spawn;
+            }
+
+            Renderer[] renderers = vehicle.GetComponentsInChildren<Renderer>(true);
+
+            if (renderers.Length == 0)
+            {
+                return spawn;
+            }
+
+            Bounds bounds = renderers[0].bounds;
+
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+
+            float ride = Mathf.Max(0f, vehicle.position.y - bounds.min.y);
+
+            RaycastHit[] hits = Physics.RaycastAll(
+                spawn + Vector3.up * 3f, Vector3.down, 28f, ~0, QueryTriggerInteraction.Ignore);
+
+            float road = float.MinValue;
+
+            foreach (RaycastHit hit in hits)
+            {
+                // Never the car itself. It may already be standing at the spawn, and its own
+                // roof would otherwise be taken for the road.
+                if (!hit.collider.transform.IsChildOf(vehicle) && hit.point.y > road)
+                {
+                    road = hit.point.y;
+                }
+            }
+
+            // A centimetre of air, so it settles onto the road rather than starting the
+            // frame already pressed into it.
+            return road > float.MinValue
+                ? new Vector3(spawn.x, road + ride + 0.01f, spawn.z)
+                : spawn;
         }
 
         private void FreezeCar()

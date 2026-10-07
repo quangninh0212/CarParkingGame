@@ -23,6 +23,7 @@ namespace CarParkingGame.UI
         [SerializeField] private GameObject practiceScreen;
         [SerializeField] private GameObject garageScreen;
         [SerializeField] private GameObject settingsScreen;
+        [SerializeField] private GameObject freeDriveScreen;
 
         [Tooltip("Aims the menu camera at the showroom car; the garage screen needs it framed differently.")]
         [SerializeField] private ShowroomCameraRig showroom;
@@ -39,6 +40,10 @@ namespace CarParkingGame.UI
         [SerializeField] private Button practiceModeButton;
         [SerializeField] private Button challengeModeButton;
         [SerializeField] private Button freeRoamModeButton;
+
+        [Header("Free drive maps")]
+        [SerializeField] private Button circuitMapButton;
+        [SerializeField] private Button cityMapButton;
 
         [Header("Back")]
         [Tooltip("Every button that means 'go back one screen'.")]
@@ -69,7 +74,9 @@ namespace CarParkingGame.UI
 
             Wire(practiceModeButton, () => Push(practiceScreen));
             Wire(challengeModeButton, StartChallenge);
-            Wire(freeRoamModeButton, StartFreeRoam);
+            Wire(freeRoamModeButton, () => Push(freeDriveScreen));
+            Wire(circuitMapButton, () => StartFreeRoam(false));
+            Wire(cityMapButton, () => StartFreeRoam(true));
 
             foreach (Button back in backButtons ?? System.Array.Empty<Button>())
             {
@@ -103,7 +110,7 @@ namespace CarParkingGame.UI
         {
             screens.Clear();
 
-            foreach (GameObject screen in new[] { homeScreen, modeScreen, practiceScreen, garageScreen, settingsScreen })
+            foreach (GameObject screen in new[] { homeScreen, modeScreen, practiceScreen, freeDriveScreen, garageScreen, settingsScreen })
             {
                 if (screen != null)
                 {
@@ -196,9 +203,9 @@ namespace CarParkingGame.UI
             Session?.StartChallenge();
         }
 
-        private void StartFreeRoam()
+        private void StartFreeRoam(bool city)
         {
-            Session?.StartFreeRoam();
+            Session?.StartFreeRoam(city);
         }
 
         private void Quit()
